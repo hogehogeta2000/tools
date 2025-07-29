@@ -1,293 +1,224 @@
-# Copilot Studio エージェント構築ガイド
-
-## 1. エージェント基本設定
-
-### **エージェント名**
-`コールセンタースクリプトアシスタント`
-
-### **エージェントの説明**
-```
-コールセンターオペレーター向けに、顧客のケースに応じた最適なトークスクリプトを動的に生成するAIアシスタントです。ケース情報を入力すると、段階的で効果的な応対スクリプトをアダプティブカードで提供します。
-```
-
-### **システム指示（Instructions）**
-```
-あなたはコールセンターオペレーター専用のトークスクリプト生成アシスタントです。
-
-## 役割と目的
-- オペレーターが入力したケース情報を分析し、最適なトークスクリプトを生成する
-- 段階的で実践的な応対フローを提供する
-- 顧客の感情や状況に配慮した適切な表現を提案する
-- アダプティブカードで視覚的に分かりやすく情報を整理する
-
-## 応答の原則
-1. **段階的アプローチ**: 会話を論理的なステップに分解
-2. **感情配慮**: 顧客の感情状態に適した表現を選択
-3. **実用性重視**: すぐに使える具体的なフレーズを提供
-4. **柔軟性確保**: 複数の選択肢や代替表現を用意
-5. **継続支援**: 次のステップや追加支援を常に提案
-
-## 分析すべき要素
-- ケースタイプ（クレーム、問い合わせ、注文等）
-- 商品・サービス名
-- 顧客の感情状態（怒り、困惑、急ぎ等）
-- 緊急度・重要度
-- 特記事項（過去の履歴、特別な配慮等）
-
-## 出力形式
-必ずアダプティブカードを使用し、以下の構造で提供：
-- ケース概要の整理
-- 推奨応対フロー（3-5段階）
-- 各段階での具体的なスクリプト例
-- 選択可能なアクション（使用、再生成、次へ）
-- 注意点やコツの提示
-```
-
-## 2. 会話フロー設計
-
-### **メイントピック構成**
-
-#### **Topic 1: ケース受付・分析**
-```yaml
-トピック名: "ケース情報入力"
-トリガーフレーズ: 
-  - "スクリプト作成"
-  - "トークスクリプト"
-  - "応対支援"
-  - "ケース対応"
-
-変数設定:
-  - caseType (選択肢: クレーム、問い合わせ、注文、技術サポート、その他)
-  - productService (テキスト)
-  - customerEmotion (選択肢: 怒り、困惑、急ぎ、普通、喜び)
-  - urgencyLevel (選択肢: 緊急、高、中、低)
-  - additionalInfo (テキスト)
-```
-
-#### **Topic 2: スクリプト生成・提示**
-```yaml
-トピック名: "スクリプト生成"
-条件: ケース情報が揃った時
-
-処理フロー:
-1. ケース分析実行
-2. 応対フロー決定
-3. アダプティブカード生成
-4. スクリプト提示
-```
-
-#### **Topic 3: スクリプト操作**
-```yaml
-トピック名: "スクリプト操作"
-トリガー: アダプティブカードのアクション
-
-操作種類:
-  - use_phrase: フレーズ使用
-  - regenerate: 再生成
-  - next_step: 次ステップ
-  - modify: カスタマイズ
-  - feedback: フィードバック
-```
-
-### **会話フロー詳細**
-
-#### **初期会話フロー**
-```
-1. 挨拶・目的確認
-   ↓
-2. ケース情報収集
-   ├─ ケースタイプ選択
-   ├─ 商品・サービス名入力
-   ├─ 顧客感情状態選択
-   ├─ 緊急度選択
-   └─ 追加情報入力
-   ↓
-3. 情報確認・分析
-   ↓
-4. スクリプト生成・提示
-   ↓
-5. オペレーター操作対応
-   ├─ フレーズ使用
-   ├─ 再生成要求
-   ├─ 次ステップ要求
-   └─ カスタマイズ要求
-```
-
-## 3. 具体的な設定手順
-
-### **Step 1: 基本設定**
-1. Copilot Studio で新しいエージェント作成
-2. 上記のエージェント名・説明・指示を設定
-3. 言語設定: 日本語
-
-### **Step 2: 変数定義**
-```
-Global Variables:
-- caseType: Text
-- productService: Text  
-- customerEmotion: Text
-- urgencyLevel: Text
-- additionalInfo: Text
-- currentPhase: Number
-- scriptSteps: Table
-```
-
-### **Step 3: トピック作成**
-
-**最初に作成するトピック: "ケース情報入力"**
-```yaml
-User Input Examples:
-  - "スクリプトを作成してください"
-  - "ケース対応を支援して"
-  - "トークスクリプトが欲しい"
-
-First Message:
-"こんにちは！コールセンタースクリプトアシスタントです。
-お客様への応対スクリプトを作成いたします。
-まず、対応するケースについて教えてください。"
-
-Question Nodes:
-1. ケースタイプ選択 (Multiple Choice)
-2. 商品・サービス名 (Open-ended)
-3. 顧客の感情状態 (Multiple Choice)  
-4. 緊急度 (Multiple Choice)
-5. 追加情報 (Open-ended, Optional)
-```
-
-### **Step 4: アダプティブカード設定**
-```json
-{
-  "type": "AdaptiveCard",
-  "version": "1.5",
-  "body": [
-    {
-      "type": "TextBlock", 
-      "text": "ケース分析結果",
-      "weight": "Bolder",
-      "size": "Medium"
-    },
-    {
-      "type": "FactSet",
-      "facts": [
-        {"title": "ケースタイプ", "value": "${caseType}"},
-        {"title": "商品・サービス", "value": "${productService}"},
-        {"title": "顧客感情", "value": "${customerEmotion}"},
-        {"title": "緊急度", "value": "${urgencyLevel}"}
-      ]
-    }
-  ]
-}
-```
-
-まずは**ケース情報入力のトピック**から作成していきましょう。Copilot Studioで新しいエージェントを作成し、上記の基本設定を入力してください。
-
-準備ができましたら、次のステップをご案内いたします！
+script_id,branch_type,condition_text,target_script_id,option_label,option_icon,sort_order
+START_001,CUSTOMER_TYPE,顧客区分,ID_001,個人のお客様,👤,1
+START_001,CUSTOMER_TYPE,顧客区分,BUSINESS_001,法人のお客様,🏢,2
+START_001,URGENCY,緊急度,EMERGENCY_001,緊急事態,🚨,3
+ID_001,YES_NO,本人確認結果,ID_002,確認できた,✓,1
+ID_001,YES_NO,本人確認結果,ERROR_001,確認できない,✗,2
+ID_002,YES_NO,追加確認結果,REQ_001,確認完了,✓,1
+ID_002,YES_NO,追加確認結果,ID_003,さらに確認,🔐,2
+ID_003,YES_NO,暗証番号確認,REQ_001,確認完了,✓,1
+ID_003,YES_NO,暗証番号確認,ERROR_002,確認失敗,✗,2
+REQ_001,MULTIPLE_CHOICE,業務カテゴリ,ACCOUNT_001,口座・預金,🏦,1
+REQ_001,MULTIPLE_CHOICE,業務カテゴリ,LOAN_001,融資・ローン,🏠,2
+REQ_001,MULTIPLE_CHOICE,業務カテゴリ,INVESTMENT_001,投資・運用,📈,3
+REQ_001,MULTIPLE_CHOICE,業務カテゴリ,CARD_001,カード関連,💳,4
+REQ_001,MULTIPLE_CHOICE,業務カテゴリ,TRANSACTION_001,振込・送金,💸,5
+REQ_001,MULTIPLE_CHOICE,業務カテゴリ,INQUIRY_001,照会・確認,💰,6
+REQ_001,MULTIPLE_CHOICE,業務カテゴリ,CHANGE_001,変更手続き,🔄,7
+REQ_001,MULTIPLE_CHOICE,業務カテゴリ,INSURANCE_001,保険商品,🛡️,8
+ACCOUNT_001,MULTIPLE_CHOICE,預金商品,ACCOUNT_001,普通預金,💳,1
+ACCOUNT_001,MULTIPLE_CHOICE,預金商品,ACCOUNT_002,定期預金,💰,2
+ACCOUNT_001,MULTIPLE_CHOICE,預金商品,ACCOUNT_003,口座開設,📋,3
+ACCOUNT_001,MULTIPLE_CHOICE,預金商品,DIGITAL_001,ネットバンキング,💻,4
+ACCOUNT_002,AMOUNT_RANGE,預入金額,ACCOUNT_002,100万円未満,💵,1
+ACCOUNT_002,AMOUNT_RANGE,預入金額,ACCOUNT_002,100万円以上,💰,2
+ACCOUNT_002,AMOUNT_RANGE,預入金額,ESC_002,1000万円以上,💎,3
+LOAN_001,MULTIPLE_CHOICE,融資種別,LOAN_002,住宅ローン,🏘️,1
+LOAN_001,MULTIPLE_CHOICE,融資種別,LOAN_003,カードローン,💳,2
+LOAN_001,MULTIPLE_CHOICE,融資種別,LOAN_005,事業融資,🏢,3
+LOAN_001,MULTIPLE_CHOICE,融資種別,LOAN_004,その他融資,❓,4
+LOAN_002,MULTIPLE_CHOICE,住宅ローン詳細,LOAN_004,新規申込,📝,1
+LOAN_002,MULTIPLE_CHOICE,住宅ローン詳細,CHANGE_001,条件変更,🔄,2
+LOAN_002,MULTIPLE_CHOICE,住宅ローン詳細,FAQ_001,金利照会,💹,3
+LOAN_003,AMOUNT_RANGE,希望借入額,LOAN_003,100万円未満,💵,1
+LOAN_003,AMOUNT_RANGE,希望借入額,LOAN_003,100万円以上,💰,2
+LOAN_003,AMOUNT_RANGE,希望借入額,ESC_002,500万円以上,💎,3
+LOAN_004,AMOUNT_RANGE,融資希望額,LOAN_004,1000万円未満,💵,1
+LOAN_004,AMOUNT_RANGE,融資希望額,ESC_002,1000万円以上,💰,2
+LOAN_004,AMOUNT_RANGE,融資希望額,ESC_002,1億円以上,💎,3
+INVESTMENT_001,MULTIPLE_CHOICE,投資商品,INVESTMENT_002,投資信託,📊,1
+INVESTMENT_001,MULTIPLE_CHOICE,投資商品,INVESTMENT_004,外貨預金,💱,2
+INVESTMENT_001,MULTIPLE_CHOICE,投資商品,INSURANCE_001,保険商品,🛡️,3
+INVESTMENT_001,MULTIPLE_CHOICE,投資商品,FAQ_001,金利・手数料,💰,4
+INVESTMENT_002,RISK_LEVEL,リスク許容度,INVESTMENT_002,安定運用,🔵,1
+INVESTMENT_002,RISK_LEVEL,リスク許容度,INVESTMENT_002,バランス運用,🟡,2
+INVESTMENT_002,RISK_LEVEL,リスク許容度,INVESTMENT_003,積極運用,🔴,3
+INVESTMENT_003,YES_NO,リスク説明理解,INVESTMENT_002,理解した,✓,1
+INVESTMENT_003,YES_NO,リスク説明理解,ESC_002,詳しく聞きたい,❓,2
+INVESTMENT_004,CURRENCY_TYPE,外貨種別,INVESTMENT_004,米ドル,🇺🇸,1
+INVESTMENT_004,CURRENCY_TYPE,外貨種別,INVESTMENT_004,ユーロ,🇪🇺,2
+INVESTMENT_004,CURRENCY_TYPE,外貨種別,INVESTMENT_004,豪ドル,🇦🇺,3
+INVESTMENT_004,CURRENCY_TYPE,外貨種別,INVESTMENT_004,その他通貨,🌏,4
+CARD_001,MULTIPLE_CHOICE,カード種別,CARD_003,クレジットカード,💎,1
+CARD_001,MULTIPLE_CHOICE,カード種別,CARD_001,デビットカード,💳,2
+CARD_001,MULTIPLE_CHOICE,カード種別,INQUIRY_001,キャッシュカード,🏧,3
+CARD_001,MULTIPLE_CHOICE,カード種別,CARD_002,紛失・盗難,🚨,4
+CARD_002,URGENCY,発見時期,CARD_002,今日気づいた,⚡,1
+CARD_002,URGENCY,発見時期,CARD_002,昨日以前,📅,2
+CARD_002,URGENCY,発見時期,FRAUD_001,不正利用あり,🚨,3
+CARD_003,CARD_GRADE,カードグレード,CARD_003,ベーシック,🥉,1
+CARD_003,CARD_GRADE,カードグレード,CARD_003,ゴールド,🥇,2
+CARD_003,CARD_GRADE,カードグレード,ESC_002,プラチナ,💎,3
+CARD_004,YES_NO,再発行希望,CARD_004,再発行する,✓,1
+CARD_004,YES_NO,再発行希望,CL_001,解約する,❌,2
+TRANSACTION_001,MULTIPLE_CHOICE,取引方法,TRANSACTION_002,ATM,🏧,1
+TRANSACTION_001,MULTIPLE_CHOICE,取引方法,TRANSACTION_002,窓口,🏦,2
+TRANSACTION_001,MULTIPLE_CHOICE,取引方法,DIGITAL_002,ネットバンキング,💻,3
+TRANSACTION_001,MULTIPLE_CHOICE,取引方法,TRANSACTION_003,海外送金,🌏,4
+TRANSACTION_002,AMOUNT_RANGE,振込金額,TRANSACTION_002,10万円未満,💵,1
+TRANSACTION_002,AMOUNT_RANGE,振込金額,TRANSACTION_002,10万円以上,💰,2
+TRANSACTION_002,AMOUNT_RANGE,振込金額,COMPLIANCE_001,100万円以上,⚖️,3
+TRANSACTION_003,MULTIPLE_CHOICE,送金先地域,TRANSACTION_003,アジア,🌏,1
+TRANSACTION_003,MULTIPLE_CHOICE,送金先地域,TRANSACTION_003,北米,🌎,2
+TRANSACTION_003,MULTIPLE_CHOICE,送金先地域,TRANSACTION_003,ヨーロッパ,🌍,3
+TRANSACTION_003,MULTIPLE_CHOICE,送金先地域,ESC_002,その他,❓,4
+INQUIRY_001,MULTIPLE_CHOICE,照会種別,INQUIRY_001,残高照会,💰,1
+INQUIRY_001,MULTIPLE_CHOICE,照会種別,INQUIRY_002,取引履歴,📜,2
+INQUIRY_001,MULTIPLE_CHOICE,照会種別,FAQ_001,金利照会,💹,3
+INQUIRY_001,MULTIPLE_CHOICE,照会種別,FAQ_002,手数料照会,💰,4
+CHANGE_001,MULTIPLE_CHOICE,変更内容,CHANGE_002,住所変更,🏠,1
+CHANGE_001,MULTIPLE_CHOICE,変更内容,CHANGE_003,電話番号変更,📱,2
+CHANGE_001,MULTIPLE_CHOICE,変更内容,CHANGE_004,暗証番号変更,🔢,3
+CHANGE_001,MULTIPLE_CHOICE,変更内容,CHANGE_001,名義変更,👤,4
+CHANGE_002,PROCEDURE_METHOD,手続き方法,CHANGE_002,窓口,🏦,1
+CHANGE_002,PROCEDURE_METHOD,手続き方法,DIGITAL_002,ネット,💻,2
+CHANGE_002,PROCEDURE_METHOD,手続き方法,CHANGE_002,郵送,📮,3
+CHANGE_003,PROCEDURE_METHOD,手続き方法,CHANGE_003,窓口のみ,🏦,1
+CHANGE_004,SECURITY_LEVEL,変更理由,CHANGE_004,定期変更,🔄,1
+CHANGE_004,SECURITY_LEVEL,変更理由,CHANGE_004,忘れた,❓,2
+CHANGE_004,SECURITY_LEVEL,変更理由,FRAUD_002,盗用疑い,🚨,3
+INSURANCE_001,AGE_GROUP,年齢層,INSURANCE_002,20-30代,👨,1
+INSURANCE_001,AGE_GROUP,年齢層,INSURANCE_002,40-50代,👨‍💼,2
+INSURANCE_001,AGE_GROUP,年齢層,SENIOR_001,60歳以上,👴,3
+INSURANCE_002,INSURANCE_TYPE,保険種別,INSURANCE_002,生命保険,❤️,1
+INSURANCE_002,INSURANCE_TYPE,保険種別,INSURANCE_002,医療保険,🏥,2
+INSURANCE_002,INSURANCE_TYPE,保険種別,INSURANCE_002,がん保険,🎗️,3
+SYSTEM_001,SYSTEM_STATUS,障害状況,SYSTEM_001,部分障害,⚠️,1
+SYSTEM_001,SYSTEM_STATUS,障害状況,SYSTEM_001,全面障害,🚨,2
+SYSTEM_001,SYSTEM_STATUS,障害状況,SYSTEM_002,メンテナンス,🔧,3
+FRAUD_001,FRAUD_TYPE,不正利用種別,FRAUD_002,カード不正,💳,1
+FRAUD_001,FRAUD_TYPE,不正利用種別,FRAUD_002,口座不正,🏦,2
+FRAUD_001,FRAUD_TYPE,不正利用種別,EMERGENCY_001,なりすまし,👤,3
+FRAUD_002,DAMAGE_AMOUNT,被害金額,FRAUD_002,10万円未満,💵,1
+FRAUD_002,DAMAGE_AMOUNT,被害金額,FRAUD_002,10万円以上,💰,2
+FRAUD_002,DAMAGE_AMOUNT,被害金額,ESC_001,100万円以上,💎,3
+COMPLIANCE_001,TRANSACTION_PURPOSE,取引目的,COMPLIANCE_001,生活費,🏠,1
+COMPLIANCE_001,TRANSACTION_PURPOSE,取引目的,COMPLIANCE_001,事業資金,🏢,2
+COMPLIANCE_001,TRANSACTION_PURPOSE,取引目的,COMPLIANCE_002,投資資金,📈,3
+COMPLIANCE_001,TRANSACTION_PURPOSE,取引目的,ESC_001,その他,❓,4
+SENIOR_001,SUPPORT_LEVEL,サポートレベル,SENIOR_001,通常対応,👴,1
+SENIOR_001,SUPPORT_LEVEL,サポートレベル,SENIOR_001,丁寧対応,🤝,2
+SENIOR_001,SUPPORT_LEVEL,サポートレベル,ESC_002,家族立会,👨‍👩‍👧‍👦,3
+FOREIGN_001,LANGUAGE,対応言語,FOREIGN_001,日本語,🇯🇵,1
+FOREIGN_001,LANGUAGE,対応言語,FOREIGN_001,英語,🇺🇸,2
+FOREIGN_001,LANGUAGE,対応言語,ESC_002,その他言語,🌏,3
+BUSINESS_001,BUSINESS_SIZE,企業規模,BUSINESS_002,小規模,🏪,1
+BUSINESS_001,BUSINESS_SIZE,企業規模,BUSINESS_002,中規模,🏢,2
+BUSINESS_001,BUSINESS_SIZE,企業規模,ESC_002,大企業,🏛️,3
+BUSINESS_002,BUSINESS_TYPE,法人種別,BUSINESS_002,株式会社,🏢,1
+BUSINESS_002,BUSINESS_TYPE,法人種別,BUSINESS_002,有限会社,🏪,2
+BUSINESS_002,BUSINESS_TYPE,法人種別,BUSINESS_002,個人事業主,👤,3
+BUSINESS_002,BUSINESS_TYPE,法人種別,ESC_002,その他法人,❓,4
+EMERGENCY_001,EMERGENCY_TYPE,緊急事態種別,CARD_002,カード紛失,💳,1
+EMERGENCY_001,EMERGENCY_TYPE,緊急事態種別,FRAUD_001,不正利用,🚨,2
+EMERGENCY_001,EMERGENCY_TYPE,緊急事態種別,SYSTEM_001,システム障害,💻,3
+EMERGENCY_001,EMERGENCY_TYPE,緊急事態種別,ESC_001,その他緊急事態,⚡,4
+HOLD_001,WAIT_TIME,待機時間,HOLD_001,短時間,⏱️,1
+HOLD_001,WAIT_TIME,待機時間,HOLD_002,長時間,⏰,2
+HOLD_001,WAIT_TIME,待機時間,CB_001,コールバック,📞,3
+CB_001,CALLBACK_TIME,コールバック希望,CB_001,今日中,📞,1
+CB_001,CALLBACK_TIME,コールバック希望,CB_002,明日以降,📅,2
+CB_001,CALLBACK_TIME,コールバック希望,CB_001,時間指定,⏰,3
+CL_001,SATISFACTION,満足度,CL_002,満足,😊,1
+CL_001,SATISFACTION,満足度,CL_002,普通,😐,2
+CL_001,SATISFACTION,満足度,ESC_001,不満,😞,3
+CL_002,ADDITIONAL_QUESTION,追加質問,CL_003,ない,✓,1
+CL_002,ADDITIONAL_QUESTION,追加質問,REQ_001,ある,❓,2
+DIGITAL_001,DIGITAL_SERVICE,デジタルサービス,DIGITAL_001,スマホアプリ,📱,1
+DIGITAL_001,DIGITAL_SERVICE,デジタルサービス,DIGITAL_002,ネットバンキング,💻,2
+DIGITAL_001,DIGITAL_SERVICE,デジタルサービス,DIGITAL_001,ATM,🏧,3
+DIGITAL_002,REGISTRATION_STATUS,登録状況,DIGITAL_002,未登録,📝,1
+DIGITAL_002,REGISTRATION_STATUS,登録状況,DIGITAL_002,登録済み,✓,2
+DIGITAL_002,REGISTRATION_STATUS,登録状況,ERROR_003,ログイン不可,❌,3
+ERROR_001,ERROR_TYPE,エラー種別,ERROR_001,入力ミス,⌨️,1
+ERROR_001,ERROR_TYPE,エラー種別,ERROR_002,本人確認,🔐,2
+ERROR_001,ERROR_TYPE,エラー種別,ERROR_003,システム,💻,3
+ERROR_002,IDENTITY_METHOD,本人確認方法,ID_003,暗証番号,🔢,1
+ERROR_002,IDENTITY_METHOD,本人確認方法,CHANGE_002,窓口来店,🏦,2
+ERROR_002,IDENTITY_METHOD,本人確認方法,ESC_001,上席確認,🔄,3
+ERROR_003,SYSTEM_ACTION,システム対応,ERROR_003,再試行,🔄,1
+ERROR_003,SYSTEM_ACTION,システム対応,HOLD_002,復旧待機,⏰,2
+ERROR_003,SYSTEM_ACTION,システム対応,CB_002,後日対応,📅,3
+SPECIAL_001,CAMPAIGN_INTEREST,キャンペーン関心,ACCOUNT_003,口座開設,📋,1
+SPECIAL_001,CAMPAIGN_INTEREST,キャンペーン関心,SPECIAL_001,詳細確認,ℹ️,2
+SPECIAL_001,CAMPAIGN_INTEREST,キャンペーン関心,CL_001,興味なし,❌,3
 
 
-以下のケース情報に基づいて、コールセンターオペレーター向けの段階的トークスクリプトを生成してください。
 
-## ケース情報
-- ケースタイプ: {caseType}
-- 商品・サービス: {productService}
-- 顧客感情: {customerEmotion}  
-- 緊急度: {urgencyLevel}
 
-## 出力要件
-1. **4つの段階**に分けて構成
-   - 第1段階: 挨拶・状況確認
-   - 第2段階: 共感・理解表明
-   - 第3段階: 解決策提示・説明
-   - 第4段階: 確認・クロージング
-
-2. **各段階で以下を提供**:
-   - 💬 推奨スクリプト（2-3パターン）
-   - ⚠️ 注意点
-   - 💡 コツ・ポイント
-
-3. **顧客感情に応じた表現調整**:
-   - 怒り→謝罪・共感重視
-   - 困惑→分かりやすい説明
-   - 急ぎ→簡潔・効率重視
-   - 普通→標準的な丁寧語
-   - 満足→感謝・継続関係重視
-
-4. **緊急度に応じた対応速度**:
-   - 緊急→即座の対応・上席報告準備
-   - 高→迅速な解決策提示
-   - 中→標準的な対応フロー
-   - 低→丁寧で詳細な説明
-
-見やすく構造化された形式で出力してください。
 
 id,type,title,content,icon,category,urgency
-START_001,OP,オープニング挨拶,"お忙しい中お電話いただき、ありがとうございます。○○通信カスタマーサポートの△△と申します。本日はどのようなご用件でしょうか？",📞,basic,low
-ID_001,ID,本人確認,"ご本人様確認をさせていただきます。恐れ入りますが、お客様番号またはご登録のお電話番号をお教えいただけますでしょうか？",🔐,basic,medium
-REQ_001,REQ,要件確認,"ありがとうございます。それでは、具体的にどのようなお困りごとでしょうか？詳しくお聞かせください。",📋,basic,low
-NEW_001,INF,新規申込受付,"新規お申込みをご希望ですね。ありがとうございます。どちらのサービスにご興味をお持ちでしょうか？",📝,sales,low
-NEW_002,INF,インターネットプラン説明,"弊社では3つのインターネットプランをご用意しております。ベーシック（100Mbps）、スタンダード（500Mbps）、プレミアム（1Gbps）がございます。",🌐,sales,low
-NEW_003,INF,電話プラン説明,"固定電話サービスは基本料金1,500円でご利用いただけます。インターネットとのセット割引もございます。",☎️,sales,low
-NEW_004,REQ,契約者情報確認,"お申込みに必要な情報を確認させていただきます。契約者様のお名前、ご住所、生年月日をお教えください。",👤,sales,medium
-CHANGE_001,REQ,変更内容確認,"変更手続きですね。どちらの内容を変更されたいでしょうか？",🔄,support,low
-CHANGE_002,INF,プラン変更手続き,"プラン変更承りました。変更は翌月1日からの適用となります。変更手数料は無料です。",⚙️,support,low
-CHANGE_003,INF,住所変更手続き,"住所変更の手続きを承ります。移転工事が必要な場合がございます。新住所をお教えください。",🏠,support,medium
-CANCEL_001,REQ,解約理由確認,"解約をご希望ですね。差し支えなければ、解約の理由をお聞かせいただけますでしょうか？",❌,retention,high
-CANCEL_002,INF,解約条件説明,"解約に伴い、違約金が発生する場合がございます。また、工事費の残債がある場合は一括でのお支払いとなります。",💰,retention,high
-CANCEL_003,INF,引き止めオファー,"お客様により良いサービスをご提供したく、特別プランをご案内させていただけませんでしょうか？",🎁,retention,high
-TROUBLE_001,REQ,故障状況確認,"故障の件でお困りですね。現在の症状について詳しくお聞かせください。",🔧,technical,high
-TROUBLE_002,INF,機器確認案内,"モデムの電源ランプの状態を確認していただけますか？緑色に点灯していれば正常です。",📟,technical,high
-TROUBLE_003,INF,速度測定案内,"速度が遅い場合は、まず速度測定サイトで実際の速度を測定してみてください。",📊,technical,medium
-TROUBLE_004,REQ,詳細聞き取り,"その他の症状ですね。いつ頃から発生しているか、どのような状況で起こるかを詳しく教えてください。",❓,technical,medium
-ID_ERROR_001,ERR,本人確認エラー,"申し訳ございませんが、お客様番号が確認できませんでした。契約者様のお名前と生年月日で確認させていただけますでしょうか？",⚠️,error,high
-ESC_001,ESC,上位者エスカレーション,"申し訳ございません。より詳しい者におつなぎいたします。少々お待ちください。",🔄,escalation,high
-ESC_002,ESC,技術者派遣手配,"お客様のところに技術者を派遣させていただきます。都合の良い日時をお聞かせください。",🚗,escalation,high
-HOLD_001,HOLD,保留案内,"確認いたしますので、少々お待ちください。お待たせして申し訳ございません。",⏸️,process,medium
-CB_001,CB,コールバック提案,"調査にお時間をいただきます。後ほどこちらからお電話させていただいてもよろしいでしょうか？",📞,process,low
-CL_001,CL,通常クロージング,"ご不明な点は解決いたしましたでしょうか？他にご質問はございませんか？",✓,basic,low
-CL_002,CL,満足度確認,"本日のサポートはいかがでしたでしょうか？ご満足いただけましたでしょうか？",😊,basic,low
-CL_003,CL,終話挨拶,"ありがとうございました。今後ともよろしくお願いいたします。失礼いたします。",👋,basic,low
-OTHER_001,QA,その他問い合わせ,"その他のお問い合わせですね。どのような内容でしょうか？",❓,support,low
-FAQ_001,QA,料金確認,"ご利用料金についてですね。詳細は請求書またはWEBサイトでご確認いただけます。",💴,support,low
-FAQ_002,QA,工事日程確認,"工事日程については、工事予定日の前日に改めてご連絡させていただきます。",🏗️,support,medium
-
-script_id,branch_type,condition_text,target_script_id,option_label,option_icon,sort_order
-START_001,MULTIPLE_CHOICE,用件選択,NEW_001,新規申込,📝,1
-START_001,MULTIPLE_CHOICE,用件選択,CHANGE_001,変更手続き,🔄,2
-START_001,MULTIPLE_CHOICE,用件選択,CANCEL_001,解約手続き,❌,3
-START_001,MULTIPLE_CHOICE,用件選択,TROUBLE_001,故障・不具合,🔧,4
-START_001,MULTIPLE_CHOICE,用件選択,OTHER_001,その他,❓,5
-ID_001,YES_NO,本人確認完了,REQ_001,はい,✓,1
-ID_001,YES_NO,本人確認失敗,ID_ERROR_001,いいえ,✗,2
-NEW_001,MULTIPLE_CHOICE,サービス選択,NEW_002,インターネット,🌐,1
-NEW_001,MULTIPLE_CHOICE,サービス選択,NEW_003,固定電話,☎️,2
-NEW_001,MULTIPLE_CHOICE,サービス選択,NEW_002,セット契約,📦,3
-NEW_002,MULTIPLE_CHOICE,プラン選択,NEW_004,ベーシック,🥉,1
-NEW_002,MULTIPLE_CHOICE,プラン選択,NEW_004,スタンダード,🥈,2
-NEW_002,MULTIPLE_CHOICE,プラン選択,NEW_004,プレミアム,🥇,3
-CHANGE_001,MULTIPLE_CHOICE,変更内容選択,CHANGE_002,プラン変更,⚙️,1
-CHANGE_001,MULTIPLE_CHOICE,変更内容選択,CHANGE_003,住所変更,🏠,2
-CHANGE_001,MULTIPLE_CHOICE,変更内容選択,OTHER_001,その他変更,🔄,3
-CANCEL_001,MULTIPLE_CHOICE,解約理由,CANCEL_002,料金が高い,💰,1
-CANCEL_001,MULTIPLE_CHOICE,解約理由,CANCEL_002,引越し,🏠,2
-CANCEL_001,MULTIPLE_CHOICE,解約理由,CANCEL_002,他社に変更,🔄,3
-CANCEL_001,MULTIPLE_CHOICE,解約理由,CANCEL_003,速度不満,📊,4
-TROUBLE_001,MULTIPLE_CHOICE,症状選択,TROUBLE_002,接続できない,❌,1
-TROUBLE_001,MULTIPLE_CHOICE,症状選択,TROUBLE_003,速度が遅い,🐌,2
-TROUBLE_001,MULTIPLE_CHOICE,症状選択,TROUBLE_002,頻繁に切れる,⚡,3
-TROUBLE_001,MULTIPLE_CHOICE,症状選択,TROUBLE_004,その他,❓,4
-TROUBLE_002,YES_NO,機器状態確認,CL_001,正常に復旧,✓,1
-TROUBLE_002,YES_NO,機器状態確認,ESC_002,復旧しない,✗,2
-ID_ERROR_001,YES_NO,代替確認,REQ_001,確認できた,✓,1
-ID_ERROR_001,YES_NO,代替確認,ESC_001,確認できない,✗,2
-CANCEL_002,YES_NO,解約意思確認,CL_001,解約する,✓,1
-CANCEL_002,YES_NO,解約意思確認,CANCEL_003,検討する,🤔,2
-CANCEL_003,YES_NO,オファー受諾,CL_001,継続する,✓,1
-CANCEL_003,YES_NO,オファー受諾,CL_001,やはり解約,✗,2
-CB_001,YES_NO,コールバック希望,CL_003,はい,✓,1
-CB_001,YES_NO,コールバック希望,HOLD_001,いいえ,✗,2
-CL_001,YES_NO,他質問確認,CL_002,ない,✓,1
-CL_001,YES_NO,他質問確認,OTHER_001,ある,❓,2
-CL_002,RATING,満足度評価,CL_003,満足,😊,1
-CL_002,RATING,満足度評価,CL_003,普通,😐,2
-CL_002,RATING,満足度評価,ESC_001,不満,😞,3
-
-
+START_001,OP,オープニング挨拶,"お忙しい中お電話いただき、誠にありがとうございます。○○銀行コールセンターの△△と申します。本日はどのようなご用件でお伺いできますでしょうか？",📞,basic,low
+ID_001,ID,基本本人確認,"ご本人様確認をさせていただきます。お客様番号またはキャッシュカードに記載の口座番号をお聞かせください。",🔐,security,high
+ID_002,ID,追加本人確認,"セキュリティ強化のため、生年月日とお取引開始時にご登録いただいたお電話番号を確認させてください。",🛡️,security,high
+ID_003,ID,暗証番号確認,"キャッシュカードの暗証番号下4桁をお聞かせください。お電話では全桁お伺いいたしません。",🔢,security,high
+REQ_001,REQ,用件分類確認,"ありがとうございます。お客様のご用件は、お取引に関するもの、商品のご相談、お手続きのいずれでしょうか？",📋,basic,low
+REQ_002,REQ,緊急性確認,"承知いたしました。お急ぎの案件でしょうか？緊急を要する場合は優先的に対応させていただきます。",⚡,basic,medium
+ACCOUNT_001,INF,普通預金口座開設,"普通預金口座の開設をご希望ですね。個人のお客様でしょうか、法人のお客様でしょうか？",🏦,account,low
+ACCOUNT_002,INF,定期預金商品説明,"定期預金は6ヶ月、1年、3年、5年の期間をご用意しております。現在のキャンペーン金利は年0.25%となっております。",💰,savings,low
+ACCOUNT_003,INF,口座開設必要書類,"口座開設には本人確認書類（運転免許証、マイナンバーカードなど）と印鑑が必要です。",📄,account,medium
+LOAN_001,REQ,融資相談受付,"融資のご相談ですね。住宅ローン、カードローン、事業融資のいずれでしょうか？",🏠,loan,medium
+LOAN_002,INF,住宅ローン金利案内,"住宅ローンの変動金利は年0.675%、固定金利（10年）は年1.15%です。事前審査は最短で翌営業日回答いたします。",🏘️,loan,medium
+LOAN_003,INF,カードローン説明,"カードローンは最大800万円まで、金利は年1.8%〜14.6%です。WEB完結申込も可能です。",💳,loan,medium
+LOAN_004,REQ,融資金額確認,"ご希望の融資金額はおいくらでしょうか？金額に応じて必要書類が異なります。",💴,loan,high
+LOAN_005,INF,事業融資案内,"事業融資は運転資金、設備資金に対応しております。金利や条件は業種、金額により個別にご提案いたします。",🏢,loan,medium
+INVESTMENT_001,INF,投資商品案内,"投資商品は投資信託、外貨預金、個人向け国債をご用意しております。どちらにご興味をお持ちでしょうか？",📈,investment,low
+INVESTMENT_002,INF,投資信託説明,"投資信託は国内外の株式、債券型など200本以上の商品をご用意。手数料は購入時手数料0円のノーロード商品もございます。",📊,investment,medium
+INVESTMENT_003,INF,リスク説明,"投資商品は元本保証ではございません。市場変動により損失が生じる可能性があります。十分ご理解の上でご検討ください。",⚠️,investment,high
+INVESTMENT_004,INF,外貨預金説明,"外貨預金は米ドル、ユーロ、豪ドルをお取扱い。為替手数料は米ドル片道25銭、ユーロ50銭です。",💱,investment,medium
+CARD_001,REQ,カード関連問い合わせ,"カードに関するお問い合わせですね。クレジットカード、デビットカード、キャッシュカードのいずれでしょうか？",💳,card,medium
+CARD_002,REQ,紛失・盗難受付,"カードの紛失・盗難でしょうか？すぐに利用停止の手続きを行います。いつ頃気づかれましたか？",🚨,card,high
+CARD_003,INF,クレジットカード案内,"クレジットカードは年会費無料のベーシックカードから、ゴールド、プラチナカードまでご用意しております。",💎,card,low
+CARD_004,INF,カード再発行手続き,"カードの再発行手数料は1,100円です。到着まで1週間程度お時間をいただきます。",🔄,card,medium
+TRANSACTION_001,REQ,振込・送金問い合わせ,"振込・送金に関するお問い合わせですね。ATM、窓口、インターネットバンキングのいずれでしょうか？",💸,transaction,low
+TRANSACTION_002,INF,振込手数料案内,"同行間は無料、他行あては3万円未満220円、3万円以上440円です。インターネットバンキングは割引料金適用です。",💰,transaction,low
+TRANSACTION_003,REQ,海外送金問い合わせ,"海外送金のお問い合わせですね。送金先の国と通貨をお聞かせください。",🌏,transaction,medium
+INQUIRY_001,REQ,残高照会,"残高照会ですね。どちらの口座の残高をお調べいたしましょうか？",💰,inquiry,low
+INQUIRY_002,INF,取引履歴案内,"お取引履歴は過去13ヶ月分まで照会可能です。郵送、ATM、インターネットバンキングでご確認いただけます。",📜,inquiry,low
+CHANGE_001,REQ,変更手続き受付,"お手続きの内容をお聞かせください。住所、電話番号、暗証番号の変更等を承ります。",🔄,procedure,medium
+CHANGE_002,INF,住所変更手続き,"住所変更は窓口またはインターネットバンキングで承ります。窓口の場合は本人確認書類をお持ちください。",🏠,procedure,medium
+CHANGE_003,INF,電話番号変更,"電話番号変更は窓口のみの受付となります。本人確認書類と届出印をお持ちください。",📱,procedure,medium
+CHANGE_004,INF,暗証番号変更,"暗証番号変更はATMまたは窓口で承ります。生年月日、電話番号等の推測されやすい番号はお避けください。",🔢,procedure,high
+INSURANCE_001,INF,保険商品案内,"保険商品は生命保険、医療保険、がん保険をお取扱いしております。ご年齢と保障内容のご希望をお聞かせください。",🛡️,insurance,low
+INSURANCE_002,INF,生命保険説明,"生命保険は定期保険、終身保険、養老保険をご用意。保険料は年齢、性別、保険金額により決まります。",👨‍👩‍👧‍👦,insurance,medium
+SYSTEM_001,ERR,システム障害案内,"申し訳ございません。現在システムの一部に障害が発生しております。復旧まで今しばらくお待ちください。",⚠️,system,high
+SYSTEM_002,INF,メンテナンス案内,"システムメンテナンスのため、毎月第2土曜日21:00-翌7:00はインターネットバンキングがご利用いただけません。",🔧,system,medium
+FRAUD_001,REQ,不正利用報告,"不正利用の疑いがあるお取引でしょうか？詳細を確認いたしますので、お心当たりのない取引の詳細をお聞かせください。",🚨,fraud,high
+FRAUD_002,INF,不正利用対応,"すぐにカードの利用停止を行います。警察への届出と当行への報告書提出をお願いします。補償については後日ご案内いたします。",🛡️,fraud,high
+COMPLIANCE_001,INF,マネロン確認,"マネーロンダリング防止のため、お取引の目的をお聞かせください。法的な確認義務がございます。",⚖️,compliance,high
+COMPLIANCE_002,INF,税務関連説明,"一定金額以上のお取引は税務署への報告対象となります。適切な税務処理をお願いいたします。",📊,compliance,medium
+SENIOR_001,INF,高齢者向け説明,"ご高齢のお客様への配慮として、お手続きは窓口でのご相談をお勧めいたします。ご家族のお立会いも可能です。",👴,senior,medium
+FOREIGN_001,INF,外国人顧客対応,"外国人のお客様は在留カードまたは特別永住者証明書が必要です。英語での説明資料もご用意しております。",🌏,foreign,medium
+BUSINESS_001,REQ,法人顧客受付,"法人のお客様ですね。代表者様ご本人でしょうか？法人取引は専用窓口でご対応いたします。",🏢,business,medium
+BUSINESS_002,INF,法人口座開設,"法人口座開設には登記簿謄本、代表者の本人確認書類、法人印鑑証明書が必要です。",📋,business,high
+EMERGENCY_001,ESC,緊急事態対応,"緊急性の高い案件と判断いたします。すぐに専門担当者におつなぎいたします。少々お待ちください。",🚨,emergency,high
+ESC_001,ESC,上席者転送,"より詳しい担当者におつなぎいたします。これまでの内容は引き継がせていただきます。",🔄,escalation,high
+ESC_002,ESC,専門部署転送,"専門部署でより詳細にご対応いたします。お客様番号等の情報は引き継ぎいたします。",📞,escalation,high
+HOLD_001,HOLD,調査保留,"お調べいたしますので、2-3分お待ちいただけますでしょうか？恐れ入りますが、途中でお電話が切れてしまった場合は再度おかけ直しください。",⏸️,process,medium
+HOLD_002,HOLD,システム確認保留,"システムで確認いたします。少々お時間をいただきますが、そのままお待ちください。",💻,process,medium
+CB_001,CB,コールバック提案,"詳しい調査にお時間を要します。明日の営業時間内にこちらからお電話させていただいてもよろしいでしょうか？",📞,process,low
+CB_002,CB,専門部署コールバック,"専門部署からの回答に1-2営業日要します。準備でき次第、ご連絡させていただきます。",⏰,process,medium
+CL_001,CL,確認クロージング,"本日のご用件は以上でしょうか？他にご不明な点やご質問はございませんか？",✓,basic,low
+CL_002,CL,満足度確認,"本日のサポートはいかがでしたでしょうか？今後のサービス向上のためにご感想をお聞かせください。",😊,basic,low
+CL_003,CL,終話挨拶,"お忙しい中お時間をいただき、ありがとうございました。またのご利用をお待ちしております。",👋,basic,low
+CL_004,CL,継続利用案内,"今後ともよろしくお願いいたします。何かご不明な点がございましたら、いつでもお気軽にお電話ください。",🤝,basic,low
+FAQ_001,QA,金利問い合わせ,"金利は市場動向により変動いたします。最新の金利は店頭またはホームページでご確認いただけます。",💹,faq,low
+FAQ_002,QA,手数料問い合わせ,"各種手数料は商品・サービスにより異なります。詳細は手数料一覧表をご確認ください。",💰,faq,low
+FAQ_003,QA,営業時間案内,"窓口営業時間は平日9:00-15:00、ATMは24時間（メンテナンス時間除く）ご利用いただけます。",🕒,faq,low
+FAQ_004,QA,店舗案内,"最寄りの店舗・ATMは店舗検索サービスでご確認いただけます。営業時間や設置サービスもご案内しております。",🏦,faq,low
+ERROR_001,ERR,口座番号エラー,"恐れ入りますが、口座番号が確認できませんでした。もう一度正確にお聞かせいただけますでしょうか？",❌,error,medium
+ERROR_002,ERR,本人確認エラー,"本人確認が取れませんでした。窓口での本人確認書類によるお手続きをお願いいたします。",⚠️,error,high
+ERROR_003,ERR,システムエラー,"申し訳ございません。システムエラーが発生しております。しばらく時間をおいて再度お試しください。",💻,error,high
+DIGITAL_001,INF,スマホアプリ案内,"スマートフォンアプリでは残高照会、振込、投資信託購入などができます。ダウンロードは無料です。",📱,digital,low
+DIGITAL_002,INF,ネットバンキング案内,"インターネットバンキングは24時間ご利用可能です。初回登録時は店舗での手続きが必要です。",💻,digital,low
+SPECIAL_001,INF,キャンペーン案内,"現在、新規口座開設でもれなく1,000円プレゼントキャンペーンを実施中です。期間は今月末までです。",🎁,special,low
