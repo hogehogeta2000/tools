@@ -1,0 +1,24 @@
+# プロセスマイニング サンプルデータ生成用 Python依存関係
+# 
+# インストール方法:
+# pip install -r requirements.txt
+#
+# または仮想環境を使用する場合:
+# python -m venv venv
+# source venv/bin/activate  # Windows: venv\Scripts\activate
+# pip install -r requirements.txt
+
+# データ操作・分析
+pandas>=2.0.0,<3.0.0
+numpy>=1.24.0,<2.0.0
+
+# ダミーデータ生成（日本語対応）
+Faker>=19.0.0,<20.0.0
+
+# オプション: データ可視化（分析確認用）
+matplotlib>=3.7.0,<4.0.0
+seaborn>=0.12.0,<1.0.0
+
+# オプション: Excel出力サポート
+openpyxl>=3.1.0,<4.0.0
+xlsxwriter>=3.1.0,<4.0.0
