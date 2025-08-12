@@ -1,0 +1,6 @@
+processdefinitionid,name,processkey,description,processtype,targetdurationhours,sladurationhours,owningdepartment,isactive
+PD-0001,住宅ローン審査プロセス,HL,個人顧客の住宅ローン申込から融資実行までの審査プロセス,100000000,168,336,融資部,TRUE
+PD-0002,法人口座開設プロセス,CA,法人顧客の新規口座開設プロセス,100000000,72,168,営業部,TRUE
+PD-0003,投資信託販売プロセス,IT,個人顧客への投資信託商品販売プロセス,100000001,24,72,商品部,TRUE
+PD-0004,外国為替取引プロセス,FX,法人顧客の外貨取引プロセス,100000002,4,8,外為部,TRUE
+PD-0005,個人融資審査プロセス,PL,個人顧客への各種融資審査プロセス,100000000,120,240,融資部,TRUE
