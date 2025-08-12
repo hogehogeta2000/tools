@@ -1,0 +1,396 @@
+# プロセスマイニング最適化 データモデル設計
+
+## 1. グローバル選択肢（Global Option Sets）定義
+
+### 1.1 プロセス種別（processtype）
+| 値 | ラベル | 説明 |
+|---|-------|------|
+| 100000000 | 審査系 | 融資審査、口座開設審査等 |
+| 100000001 | 販売系 | 商品販売、サービス提供等 |
+| 100000002 | 取引系 | 為替取引、決済処理等 |
+| 100000003 | 管理系 | リスク管理、コンプライアンス等 |
+
+### 1.2 アクティビティ種別（activitytype）
+| 値 | ラベル | 説明 |
+|---|-------|------|
+| 100000000 | 受付 | 申込受付、相談受付等 |
+| 100000001 | 確認 | 書類確認、本人確認等 |
+| 100000002 | 審査 | 信用審査、適合性審査等 |
+| 100000003 | 処理 | システム処理、事務処理等 |
+| 100000004 | 承認 | 上席承認、委員会承認等 |
+| 100000005 | 通知 | 顧客通知、完了通知等 |
+
+### 1.3 顧客種別（customertype）
+| 値 | ラベル | 説明 |
+|---|-------|------|
+| 100000000 | 個人 | 個人顧客 |
+| 100000001 | 法人 | 法人顧客 |
+| 100000002 | 個人事業主 | 個人事業主 |
+
+### 1.4 実行ステータス（executionstatus）
+| 値 | ラベル | 説明 |
+|---|-------|------|
+| 100000000 | 正常完了 | 通常通り完了 |
+| 100000001 | エラー完了 | エラー後に完了 |
+| 100000002 | 中断 | 途中で中断 |
+| 100000003 | スキップ | 条件によりスキップ |
+| 100000004 | リワーク | やり直し実行 |
+
+### 1.5 リワーク理由（reworkreason）
+| 値 | ラベル | 説明 |
+|---|-------|------|
+| 100000000 | 書類不備 | 必要書類の不足・不備 |
+| 100000001 | 情報不足 | 追加情報の要求 |
+| 100000002 | システムエラー | システム障害による再実行 |
+| 100000003 | 手続きミス | 手続き上のミス |
+| 100000004 | 顧客要求 | 顧客からの変更要求 |
+
+### 1.6 遷移種別（transitiontype）
+| 値 | ラベル | 説明 |
+|---|-------|------|
+| 100000000 | 順次 | 通常の順次実行 |
+| 100000001 | 並行開始 | 並行処理の開始 |
+| 100000002 | 並行終了 | 並行処理の合流 |
+| 100000003 | 条件分岐 | 条件による分岐 |
+| 100000004 | 例外処理 | 例外フローへの遷移 |
+| 100000005 | ループバック | 前のアクティビティへの戻り |
+
+### 1.7 優先度（priority）
+| 値 | ラベル | 説明 |
+|---|-------|------|
+| 100000000 | 低 | 通常処理 |
+| 100000001 | 中 | 標準処理 |
+| 100000002 | 高 | 優先処理 |
+| 100000003 | 緊急 | 緊急処理 |
+
+### 1.8 エラー分類（errorcategory）
+| 値 | ラベル | 説明 |
+|---|-------|------|
+| 100000000 | 顧客起因 | 顧客側の不備・遅延 |
+| 100000001 | システム起因 | システム障害・不具合 |
+| 100000002 | 手続き起因 | 手続き・ルールの問題 |
+| 100000003 | 外部起因 | 外部機関・システムの問題 |
+
+## 2. エンティティ詳細設計
+
+### 2.1 ProcessDefinition（プロセス定義）
+**論理名**: processdefinition  
+**主キー**: processdefinitionid (オートナンバー)  
+**プライマリネーム**: name
+
+| 列名 | 表示名 | データ型 | 必須 | 説明 | オートナンバー設定 |
+|------|--------|----------|------|------|--------------------|
+| processdefinitionid | プロセス定義ID | 一意識別子 | ✓ | 主キー | PD-{SEQNUM:0000} |
+| name | プロセス名 | 1行テキスト(100) | ✓ | プライマリネーム | - |
+| processkey | プロセスキー | 1行テキスト(10) | ✓ | プロセス識別子 | - |
+| description | プロセス説明 | 複数行テキスト(500) |  | プロセス詳細説明 | - |
+| processtype | プロセス種別 | 選択肢 | ✓ | プロセス分類 | - |
+| targetdurationhours | 目標処理時間 | 整数 |  | 目標処理時間（時間） | - |
+| sladurationhours | SLA時間 | 整数 |  | SLA基準時間 | - |
+| owningdepartment | 主管部署 | 1行テキスト(50) |  | 責任部署 | - |
+| isactive | 有効 | はい/いいえ | ✓ | 有効フラグ | - |
+
+### 2.2 ActivityDefinition（アクティビティ定義）
+**論理名**: activitydefinition  
+**主キー**: activitydefinitionid (オートナンバー)  
+**プライマリネーム**: name
+
+| 列名 | 表示名 | データ型 | 必須 | 説明 | オートナンバー設定 |
+|------|--------|----------|------|------|--------------------|
+| activitydefinitionid | アクティビティ定義ID | 一意識別子 | ✓ | 主キー | AD-{SEQNUM:0000} |
+| name | アクティビティ名 | 1行テキスト(100) | ✓ | プライマリネーム | - |
+| activitykey | アクティビティキー | 1行テキスト(10) | ✓ | アクティビティ識別子 | - |
+| processdefinition | プロセス定義 | 参照 | ✓ | プロセス定義への参照 | - |
+| activitysequence | 実行順序 | 整数 | ✓ | 標準実行順序 | - |
+| activitytype | アクティビティ種別 | 選択肢 | ✓ | アクティビティ分類 | - |
+| responsibledepartment | 担当部署 | 1行テキスト(50) | ✓ | 責任部署 | - |
+| standarddurationminutes | 標準処理時間 | 整数 |  | 標準処理時間（分） | - |
+| sladurationminutes | SLA時間 | 整数 |  | アクティビティSLA（分） | - |
+| ismandatory | 必須ステップ | はい/いいえ | ✓ | 必須実行フラグ | - |
+| canparallel | 並行実行可能 | はい/いいえ |  | 並行実行可能フラグ | - |
+| automationlevel | 自動化レベル | 選択肢 |  | 自動化状況 | - |
+| skillrequired | 必要スキル | 1行テキスト(100) |  | 実行に必要なスキル | - |
+
+### 2.3 Customer（顧客）
+**論理名**: customer  
+**主キー**: customerid (オートナンバー)  
+**プライマリネーム**: name
+
+| 列名 | 表示名 | データ型 | 必須 | 説明 | オートナンバー設定 |
+|------|--------|----------|------|------|--------------------|
+| customerid | 顧客ID | 一意識別子 | ✓ | 主キー | CUST-{SEQNUM:000000} |
+| name | 顧客名 | 1行テキスト(100) | ✓ | プライマリネーム | - |
+| customerkey | 顧客キー | 1行テキスト(20) | ✓ | 顧客識別子 | - |
+| customertype | 顧客種別 | 選択肢 | ✓ | 顧客分類 | - |
+| registrationdate | 登録日 | 日付のみ |  | 顧客登録日 | - |
+| primarybranch | 主取引店 | 1行テキスト(50) |  | メイン取引拠点 | - |
+| contactemail | 連絡先メール | メール |  | 主要連絡先 | - |
+| contactphone | 連絡先電話 | 電話 |  | 主要電話番号 | - |
+| isactive | 有効 | はい/いいえ | ✓ | 有効フラグ | - |
+
+### 2.4 ProcessCase（プロセスケース）
+**論理名**: processcase  
+**主キー**: processcaseid (オートナンバー)  
+**プライマリネーム**: name
+
+| 列名 | 表示名 | データ型 | 必須 | 説明 | オートナンバー設定 |
+|------|--------|----------|------|------|--------------------|
+| processcaseid | プロセスケースID | 一意識別子 | ✓ | 主キー | CASE-{SEQNUM:000000} |
+| name | ケース名 | 1行テキスト(100) | ✓ | プライマリネーム | - |
+| casekey | ケースキー | 1行テキスト(20) | ✓ | ケース識別子 | - |
+| processdefinition | プロセス定義 | 参照 | ✓ | プロセス定義への参照 | - |
+| customer | 顧客 | 参照 | ✓ | 顧客への参照 | - |
+| casestatus | ケース状態 | 選択肢 | ✓ | 現在の状態 | - |
+| priority | 優先度 | 選択肢 |  | 処理優先度 | - |
+| caseamount | 取引金額 | 通貨 |  | 関連取引金額 | - |
+| startedat | 開始日時 | 日付と時刻 | ✓ | プロセス開始日時 | - |
+| completedat | 完了日時 | 日付と時刻 |  | プロセス完了日時 | - |
+| totalprocessingminutes | 総処理時間 | 整数 |  | アクティブ処理時間の合計（分） | - |
+| totalwaitingminutes | 総待機時間 | 整数 |  | 待機時間の合計（分） | - |
+| totaldurationminutes | 総所要時間 | 整数 |  | 開始から完了までの総時間（分） | - |
+| initiatingbranch | 開始拠点 | 1行テキスト(50) | ✓ | 処理開始拠点 | - |
+| currentactivity | 現在アクティビティ | 参照 |  | 現在実行中のアクティビティ | - |
+| slabreach | SLA違反 | はい/いいえ |  | SLA基準超過フラグ | - |
+| escalated | エスカレーション済み | はい/いいえ |  | 上位者への報告済み | - |
+| reworkcount | リワーク回数 | 整数 |  | やり直し実行回数 | - |
+
+### 2.5 Resource（リソース）
+**論理名**: resource  
+**主キー**: resourceid (オートナンバー)  
+**プライマリネーム**: name
+
+| 列名 | 表示名 | データ型 | 必須 | 説明 | オートナンバー設定 |
+|------|--------|----------|------|------|--------------------|
+| resourceid | リソースID | 一意識別子 | ✓ | 主キー | RES-{SEQNUM:0000} |
+| name | リソース名 | 1行テキスト(100) | ✓ | プライマリネーム | - |
+| resourcekey | リソースキー | 1行テキスト(20) | ✓ | リソース識別子 | - |
+| resourcetype | リソース種別 | 選択肢 | ✓ | リソース分類 | - |
+| department | 所属部署 | 1行テキスト(50) |  | 所属組織 | - |
+| role | 役割 | 1行テキスト(50) |  | 担当役割 | - |
+| experiencelevel | 経験レベル | 選択肢 |  | スキルレベル | - |
+| costperhour | 時間単価 | 通貨 |  | 1時間あたりコスト | - |
+| capacityperday | 日次処理能力 | 整数 |  | 1日の処理可能件数 | - |
+| isavailable | 利用可能 | はい/いいえ | ✓ | 稼働状況 | - |
+
+### 2.6 ActivityInstance（アクティビティインスタンス）★コア
+**論理名**: activityinstance  
+**主キー**: activityinstanceid (オートナンバー)  
+**プライマリネーム**: name
+
+| 列名 | 表示名 | データ型 | 必須 | 説明 | オートナンバー設定 |
+|------|--------|----------|------|------|--------------------|
+| activityinstanceid | アクティビティインスタンスID | 一意識別子 | ✓ | 主キー | AI-{SEQNUM:0000000} |
+| name | インスタンス名 | 1行テキスト(150) | ✓ | プライマリネーム | - |
+| processcase | プロセスケース | 参照 | ✓ | ケースへの参照 | - |
+| activitydefinition | アクティビティ定義 | 参照 | ✓ | アクティビティへの参照 | - |
+| resource | 実行リソース | 参照 | ✓ | 実行者への参照 | - |
+| executionsequence | 実行順序 | 整数 | ✓ | ケース内での実行順序 | - |
+| iterationnumber | 反復回数 | 整数 | ✓ | 同一アクティビティの実行回数 | - |
+| startedat | 開始日時 | 日付と時刻 | ✓ | アクティビティ開始時刻 | - |
+| completedat | 完了日時 | 日付と時刻 |  | アクティビティ完了時刻 | - |
+| processingminutes | 処理時間 | 整数 |  | 実際の処理時間（分） | - |
+| waitingminutes | 待機時間 | 整数 |  | 開始前の待機時間（分） | - |
+| queueminutes | キュー時間 | 整数 |  | 担当者のキューでの待機時間（分） | - |
+| executionstatus | 実行ステータス | 選択肢 | ✓ | 実行結果 | - |
+| reworkreason | リワーク理由 | 選択肢 |  | やり直しの理由 | - |
+| processingcost | 処理コスト | 通貨 |  | 処理にかかったコスト | - |
+| qualityscore | 品質スコア | 10進数 |  | 処理品質評価（1-10） | - |
+| location | 実行場所 | 1行テキスト(50) |  | 処理場所 | - |
+| systemused | 使用システム | 1行テキスト(50) |  | 利用システム名 | - |
+| comments | コメント | 複数行テキスト(500) |  | 備考・特記事項 | - |
+| isrework | リワーク | はい/いいえ |  | やり直し実行フラグ | - |
+| slabreached | SLA違反 | はい/いいえ |  | アクティビティSLA違反 | - |
+
+### 2.7 ActivityTransition（アクティビティ遷移）★ボトルネック分析用
+**論理名**: activitytransition  
+**主キー**: activitytransitionid (オートナンバー)  
+**プライマリネーム**: name
+
+| 列名 | 表示名 | データ型 | 必須 | 説明 | オートナンバー設定 |
+|------|--------|----------|------|------|--------------------|
+| activitytransitionid | アクティビティ遷移ID | 一意識別子 | ✓ | 主キー | AT-{SEQNUM:0000000} |
+| name | 遷移名 | 1行テキスト(150) | ✓ | プライマリネーム | - |
+| processcase | プロセスケース | 参照 | ✓ | ケースへの参照 | - |
+| fromactivity | 遷移元アクティビティ | 参照 |  | 遷移元のアクティビティインスタンス | - |
+| toactivity | 遷移先アクティビティ | 参照 | ✓ | 遷移先のアクティビティインスタンス | - |
+| transitiontype | 遷移種別 | 選択肢 | ✓ | 遷移の種類 | - |
+| transitiontime | 遷移時間 | 日付と時刻 | ✓ | 遷移発生時刻 | - |
+| handoffduration | ハンドオフ時間 | 整数 |  | 引き継ぎにかかった時間（分） | - |
+| waitingduration | 待機時間 | 整数 |  | 次のアクティビティまでの待機時間（分） | - |
+| fromresource | 遷移元リソース | 参照 |  | 引き継ぎ元担当者 | - |
+| toresource | 遷移先リソース | 参照 |  | 引き継ぎ先担当者 | - |
+| transitionreason | 遷移理由 | 1行テキスト(100) |  | 遷移の理由・条件 | - |
+| isbottleneck | ボトルネック | はい/いいえ |  | ボトルネック発生フラグ | - |
+
+### 2.8 ProcessError（プロセスエラー）
+**論理名**: processerror  
+**主キー**: processerrorid (オートナンバー)  
+**プライマリネーム**: name
+
+| 列名 | 表示名 | データ型 | 必須 | 説明 | オートナンバー設定 |
+|------|--------|----------|------|------|--------------------|
+| processerrorid | プロセスエラーID | 一意識別子 | ✓ | 主キー | ERR-{SEQNUM:0000000} |
+| name | エラー名 | 1行テキスト(150) | ✓ | プライマリネーム | - |
+| activityinstance | 関連アクティビティ | 参照 | ✓ | アクティビティインスタンスへの参照 | - |
+| errortype | エラー種別 | 1行テキスト(50) | ✓ | エラーの種類 | - |
+| errorcategory | エラー分類 | 選択肢 | ✓ | エラー原因分類 | - |
+| errordescription | エラー詳細 | 複数行テキスト(1000) | ✓ | 詳細説明 | - |
+| detectedat | 検出日時 | 日付と時刻 | ✓ | エラー検出時刻 | - |
+| resolvedat | 解決日時 | 日付と時刻 |  | エラー解決時刻 | - |
+| resolutionminutes | 解決時間 | 整数 |  | エラー解決にかかった時間（分） | - |
+| resolutionaction | 解決アクション | 複数行テキスト(1000) |  | 実施した解決策 | - |
+| additionalcost | 追加コスト | 通貨 |  | エラーによる追加費用 | - |
+| causesrework | リワーク原因 | はい/いいえ |  | このエラーがリワークを引き起こしたか | - |
+
+## 3. エンティティ関係
+
+### 3.1 主要リレーションシップ
+```
+ProcessDefinition (1:N) ActivityDefinition
+ProcessDefinition (1:N) ProcessCase
+Customer (1:N) ProcessCase
+ProcessCase (1:N) ActivityInstance ★コア関係
+ActivityDefinition (1:N) ActivityInstance
+Resource (1:N) ActivityInstance
+ProcessCase (1:N) ActivityTransition ★ボトルネック分析
+ActivityInstance (1:1) ActivityTransition.fromactivity
+ActivityInstance (1:1) ActivityTransition.toactivity
+ActivityInstance (1:N) ProcessError
+```
+
+### 3.2 分析用計算フィールド
+
+#### ProcessCase エンティティ
+```javascript
+// 総処理時間 = 全アクティビティインスタンスの処理時間合計
+totalprocessingminutes = SUM(ActivityInstance.processingminutes)
+
+// 総待機時間 = 全アクティビティ遷移の待機時間合計  
+totalwaitingminutes = SUM(ActivityTransition.waitingduration)
+
+// 処理効率 = 処理時間 / 総所要時間
+processingefficiency = totalprocessingminutes / totaldurationminutes
+
+// リワーク率 = リワークアクティビティ数 / 総アクティビティ数
+reworkrate = COUNT(ActivityInstance WHERE isrework = true) / COUNT(ActivityInstance)
+```
+
+#### ActivityInstance エンティティ
+```javascript
+// SLA違反判定
+slabreached = processingminutes > ActivityDefinition.sladurationminutes
+
+// 処理コスト自動計算
+processingcost = (processingminutes / 60) * Resource.costperhour
+
+// インスタンス名自動生成
+name = ProcessCase.casekey + " - " + ActivityDefinition.name + " (" + iterationnumber + ")"
+```
+
+## 4. ボトルネック分析用ビュー
+
+### 4.1 アクティビティパフォーマンス分析
+```sql
+CREATE VIEW ActivityPerformanceAnalysis AS
+SELECT 
+    ad.activitykey,
+    ad.name as ActivityName,
+    pd.name as ProcessName,
+    COUNT(*) as ExecutionCount,
+    AVG(ai.processingminutes) as AvgProcessingTime,
+    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ai.processingminutes) as MedianProcessingTime,
+    PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY ai.processingminutes) as P95ProcessingTime,
+    MAX(ai.processingminutes) as MaxProcessingTime,
+    COUNT(CASE WHEN ai.slabreached = 1 THEN 1 END) as SLABreachCount,
+    CAST(COUNT(CASE WHEN ai.slabreached = 1 THEN 1 END) AS FLOAT) / COUNT(*) as SLABreachRate,
+    COUNT(CASE WHEN ai.isrework = 1 THEN 1 END) as ReworkCount,
+    AVG(ai.qualityscore) as AvgQualityScore
+FROM activityinstance ai
+JOIN activitydefinition ad ON ai.activitydefinition = ad.activitydefinitionid
+JOIN processcase pc ON ai.processcase = pc.processcaseid  
+JOIN processdefinition pd ON pc.processdefinition = pd.processdefinitionid
+WHERE ai.executionstatus = 100000000 -- 正常完了
+GROUP BY ad.activitykey, ad.name, pd.name
+```
+
+### 4.2 ハンドオフボトルネック分析
+```sql
+CREATE VIEW HandoffBottleneckAnalysis AS
+SELECT 
+    fromad.name as FromActivity,
+    toad.name as ToActivity,
+    AVG(at.handoffduration) as AvgHandoffTime,
+    AVG(at.waitingduration) as AvgWaitingTime,
+    COUNT(CASE WHEN at.isbottleneck = 1 THEN 1 END) as BottleneckCount,
+    COUNT(*) as TransitionCount
+FROM activitytransition at
+JOIN activityinstance fromai ON at.fromactivity = fromai.activityinstanceid
+JOIN activityinstance toai ON at.toactivity = toai.activityinstanceid
+JOIN activitydefinition fromad ON fromai.activitydefinition = fromad.activitydefinitionid
+JOIN activitydefinition toad ON toai.activitydefinition = toad.activitydefinitionid
+GROUP BY fromad.name, toad.name
+HAVING AVG(at.waitingduration) > 60 -- 1時間以上の待機時間
+```
+
+### 4.3 リソースパフォーマンス分析
+```sql
+CREATE VIEW ResourcePerformanceAnalysis AS
+SELECT 
+    r.name as ResourceName,
+    r.department,
+    COUNT(*) as ActivityCount,
+    AVG(ai.processingminutes) as AvgProcessingTime,
+    AVG(ai.qualityscore) as AvgQuality,
+    COUNT(CASE WHEN ai.isrework = 1 THEN 1 END) as ReworkCount,
+    SUM(ai.processingcost) as TotalCost
+FROM activityinstance ai
+JOIN resource r ON ai.resource = r.resourceid
+WHERE ai.executionstatus = 100000000
+GROUP BY r.name, r.department
+```
+
+## 5. Power BI用DAX メジャー
+
+```dax
+-- 平均処理時間
+平均処理時間 = AVERAGE(ActivityInstance[processingminutes])
+
+-- ボトルネックアクティビティ識別
+ボトルネック率 = 
+DIVIDE(
+    CALCULATE(COUNT(ActivityInstance[activityinstanceid]), 
+             ActivityInstance[processingminutes] > ActivityDefinition[standarddurationminutes] * 2),
+    COUNT(ActivityInstance[activityinstanceid])
+)
+
+-- プロセス効率
+プロセス効率 = 
+DIVIDE(
+    SUM(ProcessCase[totalprocessingminutes]),
+    SUM(ProcessCase[totaldurationminutes])
+)
+
+-- リワーク影響
+リワーク影響時間 = 
+CALCULATE(
+    SUM(ActivityInstance[processingminutes]),
+    ActivityInstance[isrework] = TRUE
+)
+```
+
+## 6. 主要な改善ポイント
+
+### ✅ ボトルネック分析に最適化
+1. **ActivityInstance**: 各実行を1レコードで管理、直接的な分析が可能
+2. **ActivityTransition**: ハンドオフ時間、待機時間を明示的に記録
+3. **リワーク管理**: 同一アクティビティの複数実行を追跡
+
+### ✅ プロセスマイニング標準対応
+1. **Event Log構造**: Case ID + Activity + Timestamp + Resource の標準形式
+2. **分析クエリ簡素化**: JOINの複雑性を大幅に削減
+3. **パフォーマンス**: インデックス最適化によるクエリ高速化
+
+### ✅ Power Platform統合
+1. **Power BI**: 直接的なボトルネック可視化
+2. **Power Apps**: リアルタイムプロセス監視
+3. **Power Automate**: SLA違反時の自動アラート
