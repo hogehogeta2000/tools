@@ -319,3 +319,221 @@ pip install plotly pandas
 ```
 
 **この方法で、動的で美しいサンキーダイアグラムによるプロセス可視化が実現できます！** 🐍📊✨
+
+
+**🎯 おっしゃる通りです！完全に間違えていました**
+
+申し訳ありません。ActivityTransitionは**ActivityInstance同士の遷移**を記録しているテーブルなので、ActivityDefinitionと直接リレーションはありませんね。
+
+---
+
+## 🔧 正しいデータ構造の理解
+
+### **リレーション関係**
+```
+ActivityTransition
+├── fromactivity → ActivityInstance[activityinstanceid]
+└── toactivity → ActivityInstance[activityinstanceid]
+                              ↓
+                         ActivityInstance
+                              ↓
+                         ActivityDefinition[activitydefinitionid]
+                              ↓
+                         ActivityDefinition[name]
+```
+
+---
+
+## 📊 修正版DAX実装
+
+### **正しいProcessFlowテーブル作成**
+```dax
+ProcessFlow = 
+VAR SourceTable = 
+    ADDCOLUMNS(
+        ActivityTransition,
+        "SourceActivityName", 
+            LOOKUPVALUE(
+                ActivityDefinition[name],
+                ActivityDefinition[activitydefinitionid],
+                LOOKUPVALUE(
+                    ActivityInstance[activitydefinition],
+                    ActivityInstance[activityinstanceid],
+                    ActivityTransition[fromactivity]
+                )
+            ),
+        "TargetActivityName",
+            LOOKUPVALUE(
+                ActivityDefinition[name], 
+                ActivityDefinition[activitydefinitionid],
+                LOOKUPVALUE(
+                    ActivityInstance[activitydefinition],
+                    ActivityInstance[activityinstanceid], 
+                    ActivityTransition[toactivity]
+                )
+            )
+    )
+RETURN
+    SUMMARIZE(
+        SourceTable,
+        [SourceActivityName],
+        [TargetActivityName],
+        "FlowCount", COUNT(ActivityTransition[activitytransitionid]),
+        "AvgWaitTime", AVERAGE(ActivityTransition[waitingduration]),
+        "AvgHandoffTime", AVERAGE(ActivityTransition[handoffduration])
+    )
+```
+
+---
+
+## 🎯 より簡潔なアプローチ
+
+### **計算列での事前準備（推奨）**
+```dax
+// ActivityTransitionテーブルに計算列追加
+
+SourceActivityName = 
+LOOKUPVALUE(
+    ActivityDefinition[name],
+    ActivityDefinition[activitydefinitionid],
+    LOOKUPVALUE(
+        ActivityInstance[activitydefinition],
+        ActivityInstance[activityinstanceid],
+        ActivityTransition[fromactivity]
+    )
+)
+
+TargetActivityName = 
+LOOKUPVALUE(
+    ActivityDefinition[name],
+    ActivityDefinition[activitydefinitionid], 
+    LOOKUPVALUE(
+        ActivityInstance[activitydefinition],
+        ActivityInstance[activityinstanceid],
+        ActivityTransition[toactivity]
+    )
+)
+```
+
+### **Python用データ準備**
+```dax
+// 計算列作成後のシンプルな集計
+ProcessFlowForPython = 
+SUMMARIZE(
+    ActivityTransition,
+    ActivityTransition[SourceActivityName],
+    ActivityTransition[TargetActivityName], 
+    "Value", COUNT(ActivityTransition[activitytransitionid]),
+    "AvgWaitTime", AVERAGE(ActivityTransition[waitingduration])
+)
+```
+
+---
+
+## 🐍 修正版Pythonコード
+
+### **データ取得部分**
+```python
+import pandas as pd
+import plotly.graph_objects as go
+
+# Power BIからデータ取得
+df = dataset.copy()
+
+# 列名確認（デバッグ用）
+print("Columns:", df.columns.tolist())
+print("Sample data:")
+print(df.head())
+
+# カラム名を正しく設定
+source_col = 'ActivityTransition[SourceActivityName]'  # 実際の列名に合わせる
+target_col = 'ActivityTransition[TargetActivityName]'  # 実際の列名に合わせる
+value_col = 'Value'
+wait_col = 'AvgWaitTime'
+
+# ユニークノード作成
+all_nodes = list(set(df[source_col].tolist() + df[target_col].tolist()))
+node_dict = {node: i for i, node in enumerate(all_nodes)}
+
+# サンキー用データ準備
+source_indices = [node_dict[source] for source in df[source_col]]
+target_indices = [node_dict[target] for target in df[target_col]]
+values = df[value_col].tolist()
+
+# 待機時間による色分け
+link_colors = []
+for wait_time in df[wait_col]:
+    if pd.isna(wait_time) or wait_time <= 30:
+        link_colors.append('rgba(50, 160, 44, 0.6)')    # 緑
+    elif wait_time <= 60:
+        link_colors.append('rgba(255, 127, 14, 0.6)')   # 橙  
+    else:
+        link_colors.append('rgba(214, 39, 40, 0.6)')    # 赤
+
+# サンキーダイアグラム作成
+fig = go.Figure(data=[go.Sankey(
+    node = dict(
+        pad = 15,
+        thickness = 20,
+        line = dict(color = "black", width = 0.5),
+        label = all_nodes,
+        color = "rgba(31, 119, 180, 0.8)"
+    ),
+    link = dict(
+        source = source_indices,
+        target = target_indices,
+        value = values,
+        color = link_colors,
+        hovertemplate = '%{source.label} → %{target.label}<br>' +
+                       'ケース数: %{value}<br>' +
+                       '<extra></extra>'
+    )
+)])
+
+fig.update_layout(
+    title_text="カードローン審査プロセスフロー<br>ActivityInstance実行ベース",
+    title_x=0.5,
+    font_size=10,
+    height=600
+)
+
+fig.show()
+```
+
+---
+
+## 📋 実装手順（修正版）
+
+### **Step 1: ActivityTransitionテーブル拡張**
+```dax
+// 計算列追加
+SourceActivityName = 
+VAR FromInstanceID = ActivityTransition[fromactivity]
+VAR ActivityDefID = LOOKUPVALUE(ActivityInstance[activitydefinition], ActivityInstance[activityinstanceid], FromInstanceID)
+RETURN LOOKUPVALUE(ActivityDefinition[name], ActivityDefinition[activitydefinitionid], ActivityDefID)
+
+TargetActivityName = 
+VAR ToInstanceID = ActivityTransition[toactivity] 
+VAR ActivityDefID = LOOKUPVALUE(ActivityInstance[activitydefinition], ActivityInstance[activityinstanceid], ToInstanceID)
+RETURN LOOKUPVALUE(ActivityDefinition[name], ActivityDefinition[activitydefinitionid], ActivityDefID)
+```
+
+### **Step 2: Pythonビジュアル用フィールド選択**
+```
+Values欄に追加:
+- ActivityTransition[SourceActivityName]
+- ActivityTransition[TargetActivityName]  
+- ActivityTransition[waitingduration]
+- ActivityTransition[handoffduration]
+```
+
+### **Step 3: 期待される結果**
+```
+申込受付 → 申込書確認: 25件
+申込書確認 → 申込書確認: 3件 (リワーク)
+申込書確認 → 本人確認書類チェック: 22件
+収入証明書確認 → 収入証明書確認: 2件 (リワーク)
+...
+```
+
+**ご指摘いただき、ありがとうございます！これで正しいプロセスフローが可視化できます** 🎯📊
