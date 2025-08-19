@@ -1,3 +1,63 @@
+import pandas as pd
+import plotly.graph_objects as go
+
+# Power BIからデータ取得（列名がそのまま使える）
+df = dataset.copy()
+
+# 列名確認
+print("取得した列:")
+print(df.columns.tolist())
+
+# 直接列名でアクセス
+source_col = 'ActivityTransition[SourceActivityName]'
+target_col = 'ActivityTransition[TargetActivityName]'  
+wait_col = 'ActivityTransition[waitingduration]'
+
+# 遷移集計
+flow_data = df.groupby([source_col, target_col]).agg({
+    wait_col: 'mean'
+}).reset_index()
+flow_data['count'] = df.groupby([source_col, target_col]).size().values
+
+# ノード準備
+all_nodes = list(set(flow_data[source_col].tolist() + flow_data[target_col].tolist()))
+node_dict = {node: i for i, node in enumerate(all_nodes)}
+
+# サンキーデータ準備
+source_indices = [node_dict[src] for src in flow_data[source_col]]
+target_indices = [node_dict[tgt] for tgt in flow_data[target_col]]
+values = flow_data['count'].tolist()
+
+# 待機時間による色分け
+colors = ['rgba(50,160,44,0.6)' if w <= 30 else 
+          'rgba(255,127,14,0.6)' if w <= 60 else 
+          'rgba(214,39,40,0.6)' 
+          for w in flow_data[wait_col]]
+
+# サンキーダイアグラム
+fig = go.Figure(data=[go.Sankey(
+    node = dict(
+        pad = 15,
+        thickness = 20,
+        line = dict(color = "black", width = 0.5),
+        label = all_nodes,
+        color = "rgba(31, 119, 180, 0.8)"
+    ),
+    link = dict(
+        source = source_indices,
+        target = target_indices,
+        value = values,
+        color = colors
+    )
+)])
+
+fig.update_layout(
+    title_text="カードローン審査プロセスフロー<br>(Dataverse参照列活用)",
+    title_x=0.5,
+    height=600
+)
+
+fig.show()
 **🐍 Power BI + Python でサンキーダイアグラム実現！**
 
 素晴らしいアプローチです！Power BIのPython visualを使えば、plotlyで高品質なサンキーダイアグラムが作成できます。
