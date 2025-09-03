@@ -1,24 +1,350 @@
-# プロセスマイニング サンプルデータ生成用 Python依存関係
-# 
-# インストール方法:
-# pip install -r requirements.txt
-#
-# または仮想環境を使用する場合:
-# python -m venv venv
-# source venv/bin/activate  # Windows: venv\Scripts\activate
-# pip install -r requirements.txt
+現在のデータ構造を活用して、YoY（前年同期比）を含む残高分析ダッシュボードを作成する具体的なステップをお教えします。
 
-# データ操作・分析
-pandas>=2.0.0,<3.0.0
-numpy>=1.24.0,<2.0.0
+## 🏦 **現在データでYoY残高分析実装ステップ**
 
-# ダミーデータ生成（日本語対応）
-Faker>=19.0.0,<20.0.0
+### **Step 1: 残高推計ロジックの構築**
 
-# オプション: データ可視化（分析確認用）
-matplotlib>=3.7.0,<4.0.0
-seaborn>=0.12.0,<1.0.0
+**基本的な残高推計メジャー**
+```dax
+// 1. 累積取引額ベースの残高推計
+Estimated Balance = 
+CALCULATE(
+    SUM(sales_performance[amount]),
+    FILTER(
+        ALL(sales_performance[transaction_date]),
+        sales_performance[transaction_date] <= MAX(sales_performance[transaction_date])
+    )
+)
 
-# オプション: Excel出力サポート
-openpyxl>=3.1.0,<4.0.0
-xlsxwriter>=3.1.0,<4.0.0
+// 2. 商品別残高分類
+Balance Type = 
+VAR ProductCategory = 
+    LOOKUPVALUE(
+        products[product_category], 
+        products[product_id], 
+        SELECTEDVALUE(sales_performance[product_id])
+    )
+RETURN
+SWITCH(
+    ProductCategory,
+    "預金", "預金残高",
+    "融資", "融資残高", 
+    "投資信託", "運用資産",
+    "保険", "保険資産",
+    "その他資産"
+)
+
+// 3. 月末残高推計
+Month End Balance = 
+CALCULATE(
+    [Estimated Balance],
+    ENDOFMONTH(sales_performance[transaction_date])
+)
+```
+
+### **Step 2: 日付テーブルの拡張**
+
+**日付テーブルに必要な計算列を追加**
+```dax
+// 日付テーブルに追加する計算列
+Is Month End = 
+DATE(
+    YEAR([Date]),
+    MONTH([Date]),
+    DAY(EOMONTH([Date], 0))
+) = [Date]
+
+Year Month = 
+YEAR([Date]) * 100 + MONTH([Date])
+
+Year Month Text = 
+FORMAT([Date], "YYYY年MM月")
+
+Previous Year Same Month = 
+DATE(YEAR([Date]) - 1, MONTH([Date]), DAY([Date]))
+```
+
+### **Step 3: YoY残高分析メジャー**
+
+**前年同期比分析の核となるメジャー**
+```dax
+// 4. 当年残高（月末ベース）
+Current Year Balance = 
+CALCULATE(
+    SUM(sales_performance[amount]),
+    FILTER(
+        ALL(sales_performance[transaction_date]),
+        sales_performance[transaction_date] <= EOMONTH(MAX(sales_performance[transaction_date]), 0)
+    )
+)
+
+// 5. 前年同期残高
+Previous Year Balance = 
+CALCULATE(
+    [Current Year Balance],
+    SAMEPERIODLASTYEAR(sales_performance[transaction_date])
+)
+
+// 6. YoY残高成長率
+Balance YoY Growth Rate = 
+VAR CurrentBalance = [Current Year Balance]
+VAR PreviousBalance = [Previous Year Balance]
+RETURN
+DIVIDE(CurrentBalance - PreviousBalance, PreviousBalance, 0) * 100
+
+// 7. YoY残高増減額
+Balance YoY Change Amount = 
+[Current Year Balance] - [Previous Year Balance]
+
+// 8. YoY成長率カテゴリ
+YoY Growth Category = 
+VAR GrowthRate = [Balance YoY Growth Rate]
+RETURN
+SWITCH(
+    TRUE(),
+    GrowthRate > 20, "高成長 (>20%)",
+    GrowthRate > 10, "成長 (10-20%)",
+    GrowthRate > 0, "微成長 (0-10%)",
+    GrowthRate > -10, "微減 (0~-10%)",
+    "大幅減 (<-10%)"
+)
+```
+
+### **Step 4: 商品カテゴリ別YoY分析**
+
+**商品カテゴリごとの詳細分析**
+```dax
+// 9. 預金残高YoY分析
+Deposit Balance Current = 
+CALCULATE(
+    [Current Year Balance],
+    FILTER(
+        sales_performance,
+        LOOKUPVALUE(products[product_category], products[product_id], sales_performance[product_id]) = "預金"
+    )
+)
+
+Deposit Balance Previous = 
+CALCULATE(
+    [Previous Year Balance],
+    FILTER(
+        sales_performance,
+        LOOKUPVALUE(products[product_category], products[product_id], sales_performance[product_id]) = "預金"
+    )
+)
+
+Deposit YoY Growth = 
+DIVIDE([Deposit Balance Current] - [Deposit Balance Previous], [Deposit Balance Previous], 0) * 100
+
+// 10. 融資残高YoY分析
+Loan Balance Current = 
+CALCULATE(
+    [Current Year Balance],
+    FILTER(
+        sales_performance,
+        LOOKUPVALUE(products[product_category], products[product_id], sales_performance[product_id]) = "融資"
+    )
+)
+
+Loan Balance Previous = 
+CALCULATE(
+    [Previous Year Balance],
+    FILTER(
+        sales_performance,
+        LOOKUPVALUE(products[product_category], products[product_id], sales_performance[product_id]) = "融資"
+    )
+)
+
+Loan YoY Growth = 
+DIVIDE([Loan Balance Current] - [Loan Balance Previous], [Loan Balance Previous], 0) * 100
+
+// 11. 投資信託残高YoY分析
+Investment Balance Current = 
+CALCULATE(
+    [Current Year Balance],
+    FILTER(
+        sales_performance,
+        LOOKUPVALUE(products[product_category], products[product_id], sales_performance[product_id]) = "投資信託"
+    )
+)
+
+Investment Balance Previous = 
+CALCULATE(
+    [Previous Year Balance],
+    FILTER(
+        sales_performance,
+        LOOKUPVALUE(products[product_category], products[product_id], sales_performance[product_id]) = "投資信託"
+    )
+)
+
+Investment YoY Growth = 
+DIVIDE([Investment Balance Current] - [Investment Balance Previous], [Investment Balance Previous], 0) * 100
+```
+
+### **Step 5: 支店・地域別YoY分析**
+
+**地域別の残高成長分析**
+```dax
+// 12. 支店別YoY分析
+Branch Balance Current = 
+CALCULATE(
+    [Current Year Balance],
+    FILTER(
+        sales_performance,
+        LOOKUPVALUE(employees[branch_id], employees[employee_id], sales_performance[employee_id]) = SELECTEDVALUE(branches[branch_id])
+    )
+)
+
+Branch Balance Previous = 
+CALCULATE(
+    [Previous Year Balance],
+    FILTER(
+        sales_performance,
+        LOOKUPVALUE(employees[branch_id], employees[employee_id], sales_performance[employee_id]) = SELECTEDVALUE(branches[branch_id])
+    )
+)
+
+Branch YoY Growth = 
+DIVIDE([Branch Balance Current] - [Branch Balance Previous], [Branch Balance Previous], 0) * 100
+
+// 13. 地域別集計
+Region Balance YoY = 
+VAR SelectedRegion = SELECTEDVALUE(branches[region])
+RETURN
+CALCULATE(
+    [Balance YoY Growth Rate],
+    FILTER(
+        ALL(branches),
+        branches[region] = SelectedRegion
+    )
+)
+```
+
+### **Step 6: 時系列トレンド分析**
+
+**月次トレンドとYoY比較**
+```dax
+// 14. 月次残高推移
+Monthly Balance Trend = 
+CALCULATE(
+    [Current Year Balance],
+    DATESMTD(sales_performance[transaction_date])
+)
+
+// 15. 12か月移動平均
+12M Moving Average Balance = 
+CALCULATE(
+    AVERAGEX(
+        DATESINPERIOD(
+            sales_performance[transaction_date],
+            MAX(sales_performance[transaction_date]),
+            -12,
+            MONTH
+        ),
+        [Current Year Balance]
+    )
+)
+
+// 16. 四半期成長率
+Quarterly Growth Rate = 
+VAR CurrentQuarter = [Current Year Balance]
+VAR PreviousQuarter = 
+    CALCULATE(
+        [Current Year Balance],
+        DATEADD(sales_performance[transaction_date], -1, QUARTER)
+    )
+RETURN
+DIVIDE(CurrentQuarter - PreviousQuarter, PreviousQuarter, 0) * 100
+```
+
+### **Step 7: 表示用フォーマットメジャー**
+
+**ダッシュボード表示用の見やすいメジャー**
+```dax
+// 17. 表示用フォーマット
+Current Balance Display = 
+FORMAT([Current Year Balance], "#,##0,,.0") & "億円"
+
+YoY Growth Display = 
+VAR Growth = [Balance YoY Growth Rate]
+RETURN
+FORMAT(Growth, "+#,##0.0%;-#,##0.0%")
+
+YoY Change Display = 
+VAR Change = [Balance YoY Change Amount]
+RETURN
+IF(Change > 0, "▲", "▼") & FORMAT(ABS(Change), "#,##0,,.0") & "億円"
+
+Balance Trend Indicator = 
+VAR Growth = [Balance YoY Growth Rate]
+RETURN
+SWITCH(
+    TRUE(),
+    Growth > 10, "🟢 好調",
+    Growth > 0, "🔵 安定",
+    Growth > -5, "🟡 注意", 
+    "🔴 要対策"
+)
+```
+
+### **Step 8: ダッシュボード構成**
+
+**推奨レイアウト（上から順に）**
+
+**1. KPIサマリーカード（4枚横並び）**
+```
+[総残高] [YoY成長率] [成長額] [トレンド]
+Current Balance Display | YoY Growth Display | YoY Change Display | Balance Trend Indicator
+```
+
+**2. 残高推移とYoY比較チャート**
+- **ビジュアル名**: 複合チャート（折れ線＋棒グラフ）
+- **X軸**: `sales_performance[transaction_date]` (月)
+- **主軸（棒）**: `Current Year Balance`, `Previous Year Balance` 
+- **副軸（線）**: `Balance YoY Growth Rate`
+
+**3. 商品カテゴリ別YoY成長**
+- **ビジュアル名**: 集合横棒グラフ
+- **Y軸**: 商品カテゴリ
+- **X軸**: `Deposit YoY Growth`, `Loan YoY Growth`, `Investment YoY Growth`
+
+**4. 支店別YoYパフォーマンス**
+- **ビジュアル名**: マトリックス
+- **行**: `branches[region]`, `branches[branch_name]`
+- **値**: `Branch YoY Growth`, `Branch Balance Current`, `YoY Growth Category`
+
+**5. 四半期トレンド分析**
+- **ビジュアル名**: 面グラフ
+- **X軸**: 四半期
+- **Y軸**: `Quarterly Growth Rate`
+- **凡例**: 商品カテゴリ
+
+### **Step 9: 実装優先順位**
+
+**Phase 1（即座に実装可能）**
+1. `Current Year Balance`, `Previous Year Balance`
+2. `Balance YoY Growth Rate`, `Balance YoY Change Amount`
+3. 基本的なKPIカード
+
+**Phase 2（詳細分析）**
+4. 商品カテゴリ別YoY分析
+5. 支店・地域別YoY分析
+
+**Phase 3（高度な分析）**
+6. トレンド分析と予測
+7. 異常値検知とアラート
+
+### **Step 10: データ検証**
+
+**実装前の確認事項**
+```dax
+// データ整合性チェック
+Data Quality Check = 
+VAR TransactionCount = DISTINCTCOUNT(sales_performance[transaction_id])
+VAR DateRange = DATEDIFF(MIN(sales_performance[transaction_date]), MAX(sales_performance[transaction_date]), DAY)
+VAR ProductCoverage = DISTINCTCOUNT(sales_performance[product_id])
+RETURN
+"取引件数: " & TransactionCount & " | 期間: " & DateRange & "日 | 商品数: " & ProductCoverage
+```
+
+この手順で、現在のデータを最大限活用したYoY残高分析ダッシュボードが構築できます。どのPhaseから開始されますか？
