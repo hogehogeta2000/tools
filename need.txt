@@ -347,4 +347,413 @@ RETURN
 "取引件数: " & TransactionCount & " | 期間: " & DateRange & "日 | 商品数: " & ProductCoverage
 ```
 
-この手順で、現在のデータを最大限活用したYoY残高分析ダッシュボードが構築できます。どのPhaseから開始されますか？
+売上のYoY（前年同期比）分析に特化したDAXメジャーを、現在のデータ構造に基づいて提供いたします。
+
+## 📈 **Sales YoY Analysis DAX Measures**
+
+### **Basic Sales YoY Metrics**
+
+```dax
+// 1. 基本売上メジャー
+Total Sales = SUM(sales_performance[amount])
+
+Total Commission = SUM(sales_performance[commission_amount])
+
+Transaction Count = DISTINCTCOUNT(sales_performance[transaction_id])
+
+// 2. 前年同期売上
+Sales Previous Year = 
+CALCULATE(
+    [Total Sales],
+    SAMEPERIODLASTYEAR(sales_performance[transaction_date])
+)
+
+// 3. YoY売上成長率
+Sales YoY Growth Rate = 
+VAR CurrentSales = [Total Sales]
+VAR PreviousSales = [Sales Previous Year]
+RETURN
+DIVIDE(CurrentSales - PreviousSales, PreviousSales, 0) * 100
+
+// 4. YoY売上成長額
+Sales YoY Growth Amount = 
+[Total Sales] - [Sales Previous Year]
+
+// 5. YoY成長率カテゴリ
+Sales YoY Category = 
+VAR GrowthRate = [Sales YoY Growth Rate]
+RETURN
+SWITCH(
+    TRUE(),
+    GrowthRate > 50, "急成長 (>50%)",
+    GrowthRate > 20, "高成長 (20-50%)",
+    GrowthRate > 10, "成長 (10-20%)",
+    GrowthRate > 0, "微成長 (0-10%)",
+    GrowthRate > -10, "微減 (0~-10%)",
+    GrowthRate > -20, "減少 (-10~-20%)",
+    "大幅減 (<-20%)"
+)
+```
+
+### **Monthly YoY Analysis**
+
+```dax
+// 6. 月別YoY分析
+Sales MTD = 
+CALCULATE(
+    [Total Sales],
+    DATESMTD(sales_performance[transaction_date])
+)
+
+Sales MTD Previous Year = 
+CALCULATE(
+    [Sales MTD],
+    SAMEPERIODLASTYEAR(sales_performance[transaction_date])
+)
+
+Sales MTD YoY Growth = 
+DIVIDE([Sales MTD] - [Sales MTD Previous Year], [Sales MTD Previous Year], 0) * 100
+
+// 7. 月末時点の累計YoY
+Sales YTD = 
+CALCULATE(
+    [Total Sales],
+    DATESYTD(sales_performance[transaction_date])
+)
+
+Sales YTD Previous Year = 
+CALCULATE(
+    [Sales YTD],
+    SAMEPERIODLASTYEAR(sales_performance[transaction_date])
+)
+
+Sales YTD YoY Growth = 
+DIVIDE([Sales YTD] - [Sales YTD Previous Year], [Sales YTD Previous Year], 0) * 100
+```
+
+### **Quarterly YoY Analysis**
+
+```dax
+// 8. 四半期別YoY分析
+Sales QTD = 
+CALCULATE(
+    [Total Sales],
+    DATESQTD(sales_performance[transaction_date])
+)
+
+Sales QTD Previous Year = 
+CALCULATE(
+    [Sales QTD],
+    SAMEPERIODLASTYEAR(sales_performance[transaction_date])
+)
+
+Sales QTD YoY Growth = 
+DIVIDE([Sales QTD] - [Sales QTD Previous Year], [Sales QTD Previous Year], 0) * 100
+
+// 9. 四半期対四半期比較
+Sales Previous Quarter = 
+CALCULATE(
+    [Total Sales],
+    DATEADD(sales_performance[transaction_date], -1, QUARTER)
+)
+
+Sales QoQ Growth = 
+DIVIDE([Total Sales] - [Sales Previous Quarter], [Sales Previous Quarter], 0) * 100
+```
+
+### **Product Category YoY Analysis**
+
+```dax
+// 10. 商品カテゴリ別YoY分析
+Deposit Sales YoY = 
+VAR CurrentSales = 
+    CALCULATE(
+        [Total Sales],
+        FILTER(
+            sales_performance,
+            LOOKUPVALUE(products[product_category], products[product_id], sales_performance[product_id]) = "預金"
+        )
+    )
+VAR PreviousSales = 
+    CALCULATE(
+        CurrentSales,
+        SAMEPERIODLASTYEAR(sales_performance[transaction_date])
+    )
+RETURN
+DIVIDE(CurrentSales - PreviousSales, PreviousSales, 0) * 100
+
+Loan Sales YoY = 
+VAR CurrentSales = 
+    CALCULATE(
+        [Total Sales],
+        FILTER(
+            sales_performance,
+            LOOKUPVALUE(products[product_category], products[product_id], sales_performance[product_id]) = "融資"
+        )
+    )
+VAR PreviousSales = 
+    CALCULATE(
+        CurrentSales,
+        SAMEPERIODLASTYEAR(sales_performance[transaction_date])
+    )
+RETURN
+DIVIDE(CurrentSales - PreviousSales, PreviousSales, 0) * 100
+
+Investment Sales YoY = 
+VAR CurrentSales = 
+    CALCULATE(
+        [Total Sales],
+        FILTER(
+            sales_performance,
+            LOOKUPVALUE(products[product_category], products[product_id], sales_performance[product_id]) = "投資信託"
+        )
+    )
+VAR PreviousSales = 
+    CALCULATE(
+        CurrentSales,
+        SAMEPERIODLASTYEAR(sales_performance[transaction_date])
+    )
+RETURN
+DIVIDE(CurrentSales - PreviousSales, PreviousSales, 0) * 100
+
+Insurance Sales YoY = 
+VAR CurrentSales = 
+    CALCULATE(
+        [Total Sales],
+        FILTER(
+            sales_performance,
+            LOOKUPVALUE(products[product_category], products[product_id], sales_performance[product_id]) = "保険"
+        )
+    )
+VAR PreviousSales = 
+    CALCULATE(
+        CurrentSales,
+        SAMEPERIODLASTYEAR(sales_performance[transaction_date])
+    )
+RETURN
+DIVIDE(CurrentSales - PreviousSales, PreviousSales, 0) * 100
+```
+
+### **Employee & Branch YoY Analysis**
+
+```dax
+// 14. 従業員別YoY分析
+Employee Sales YoY = 
+VAR SelectedEmployee = SELECTEDVALUE(sales_performance[employee_id])
+VAR CurrentSales = 
+    CALCULATE(
+        [Total Sales],
+        sales_performance[employee_id] = SelectedEmployee
+    )
+VAR PreviousSales = 
+    CALCULATE(
+        CurrentSales,
+        SAMEPERIODLASTYEAR(sales_performance[transaction_date])
+    )
+RETURN
+DIVIDE(CurrentSales - PreviousSales, PreviousSales, 0) * 100
+
+// 15. 支店別YoY分析
+Branch Sales YoY = 
+VAR CurrentSales = 
+    CALCULATE(
+        [Total Sales],
+        FILTER(
+            sales_performance,
+            LOOKUPVALUE(employees[branch_id], employees[employee_id], sales_performance[employee_id]) = SELECTEDVALUE(branches[branch_id])
+        )
+    )
+VAR PreviousSales = 
+    CALCULATE(
+        CurrentSales,
+        SAMEPERIODLASTYEAR(sales_performance[transaction_date])
+    )
+RETURN
+DIVIDE(CurrentSales - PreviousSales, PreviousSales, 0) * 100
+
+// 16. 地域別YoY分析
+Region Sales YoY = 
+VAR SelectedRegion = SELECTEDVALUE(branches[region])
+VAR CurrentSales = 
+    CALCULATE(
+        [Total Sales],
+        FILTER(
+            ALL(branches),
+            branches[region] = SelectedRegion
+        )
+    )
+VAR PreviousSales = 
+    CALCULATE(
+        CurrentSales,
+        SAMEPERIODLASTYEAR(sales_performance[transaction_date])
+    )
+RETURN
+DIVIDE(CurrentSales - PreviousSales, PreviousSales, 0) * 100
+```
+
+### **Advanced YoY Analysis**
+
+```dax
+// 17. 移動年間YoY（Rolling 12 months）
+Sales Rolling 12M = 
+CALCULATE(
+    [Total Sales],
+    DATESINPERIOD(
+        sales_performance[transaction_date],
+        MAX(sales_performance[transaction_date]),
+        -12,
+        MONTH
+    )
+)
+
+Sales Rolling 12M Previous = 
+CALCULATE(
+    [Total Sales],
+    DATESINPERIOD(
+        sales_performance[transaction_date],
+        DATEADD(MAX(sales_performance[transaction_date]), -12, MONTH),
+        -12,
+        MONTH
+    )
+)
+
+Sales Rolling YoY Growth = 
+DIVIDE([Sales Rolling 12M] - [Sales Rolling 12M Previous], [Sales Rolling 12M Previous], 0) * 100
+
+// 18. YoY成長率の安定性指標
+YoY Growth Stability = 
+VAR Last12MonthsGrowth = 
+    ADDCOLUMNS(
+        SUMMARIZE(
+            FILTER(
+                ALL(sales_performance[transaction_date]),
+                sales_performance[transaction_date] >= DATEADD(MAX(sales_performance[transaction_date]), -12, MONTH)
+            ),
+            YEAR(sales_performance[transaction_date]),
+            MONTH(sales_performance[transaction_date])
+        ),
+        "MonthlyYoY", 
+        CALCULATE([Sales YoY Growth Rate])
+    )
+VAR StandardDeviation = 
+    STDEV.P([MonthlyYoY])
+VAR AverageGrowth = 
+    AVERAGE([MonthlyYoY])
+RETURN
+DIVIDE(StandardDeviation, ABS(AverageGrowth), 0)
+
+// 19. YoY貢献度分析
+YoY Contribution Analysis = 
+VAR CurrentSales = [Total Sales]
+VAR PreviousSales = [Sales Previous Year]
+VAR TotalCurrentSales = CALCULATE([Total Sales], ALL())
+VAR TotalPreviousSales = CALCULATE([Sales Previous Year], ALL())
+VAR ProductContribution = (CurrentSales - PreviousSales)
+VAR TotalContribution = (TotalCurrentSales - TotalPreviousSales)
+RETURN
+DIVIDE(ProductContribution, TotalContribution, 0) * 100
+```
+
+### **Display & Formatting Measures**
+
+```dax
+// 20. 表示用フォーマットメジャー
+Sales YoY Display = 
+VAR Growth = [Sales YoY Growth Rate]
+RETURN
+FORMAT(Growth, "+#,##0.0%;-#,##0.0%") 
+
+Sales Growth Amount Display = 
+VAR Amount = [Sales YoY Growth Amount]
+RETURN
+IF(Amount >= 0, "▲", "▼") & FORMAT(ABS(Amount), "#,##0,,.0") & "億円"
+
+Sales Performance Indicator = 
+VAR Growth = [Sales YoY Growth Rate]
+RETURN
+SWITCH(
+    TRUE(),
+    Growth > 20, "🟢 優秀",
+    Growth > 10, "🔵 良好",
+    Growth > 0, "🟡 普通",
+    Growth > -10, "🟠 注意",
+    "🔴 要改善"
+)
+
+Current vs Previous Display = 
+"今年: " & FORMAT([Total Sales], "#,##0,,.0") & "億円" & UNICHAR(10) &
+"前年: " & FORMAT([Sales Previous Year], "#,##0,,.0") & "億円" & UNICHAR(10) &
+"成長: " & [Sales YoY Display]
+```
+
+### **Trend Analysis Measures**
+
+```dax
+// 24. トレンド分析メジャー
+Sales Trend Direction = 
+VAR Last3MonthsAvg = 
+    CALCULATE(
+        AVERAGEX(
+            DATESINPERIOD(
+                sales_performance[transaction_date],
+                MAX(sales_performance[transaction_date]),
+                -3,
+                MONTH
+            ),
+            [Sales YoY Growth Rate]
+        )
+    )
+VAR Previous3MonthsAvg = 
+    CALCULATE(
+        AVERAGEX(
+            DATESINPERIOD(
+                sales_performance[transaction_date],
+                DATEADD(MAX(sales_performance[transaction_date]), -3, MONTH),
+                -3,
+                MONTH
+            ),
+            [Sales YoY Growth Rate]
+        )
+    )
+RETURN
+IF(Last3MonthsAvg > Previous3MonthsAvg, "改善傾向", "悪化傾向")
+
+// 25. YoYパフォーマンススコア
+YoY Performance Score = 
+VAR GrowthRate = [Sales YoY Growth Rate]
+VAR GrowthStability = 1 / (1 + [YoY Growth Stability]) // 安定性が高いほど高スコア
+VAR VolumeGrowth = DIVIDE([Transaction Count] - CALCULATE([Transaction Count], SAMEPERIODLASTYEAR(sales_performance[transaction_date])), CALCULATE([Transaction Count], SAMEPERIODLASTYEAR(sales_performance[transaction_date])), 0) * 100
+RETURN
+(GrowthRate * 0.5) + (GrowthStability * 20) + (VolumeGrowth * 0.3)
+```
+
+## 📊 **Power BI Visual Configuration**
+
+### **YoY Sales Dashboard Layout**
+
+**1. YoYサマリーKPIカード**
+- 値: `Sales YoY Display`, `Sales Growth Amount Display`, `Sales Performance Indicator`
+
+**2. 売上YoYトレンドチャート**
+- **ビジュアル名**: 複合チャート
+- X軸: `sales_performance[transaction_date]` (月)
+- 主軸: `Total Sales`, `Sales Previous Year`
+- 副軸: `Sales YoY Growth Rate`
+
+**3. 商品カテゴリ別YoY比較**
+- **ビジュアル名**: 水平棒グラフ
+- Y軸: 商品カテゴリ
+- X軸: `Deposit Sales YoY`, `Loan Sales YoY`, `Investment Sales YoY`, `Insurance Sales YoY`
+
+**4. 地域別YoYヒートマップ**
+- **ビジュアル名**: マトリックス
+- 行: `branches[region]`
+- 値: `Region Sales YoY`
+- 条件付き書式: グラデーション
+
+**5. YoY貢献度分析**
+- **ビジュアル名**: ウォーターフォールチャート
+- カテゴリ: 商品別
+- Y軸: `YoY Contribution Analysis`
+
+これらのメジャーで包括的な売上YoY分析が可能になります！
